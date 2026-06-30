@@ -24,7 +24,7 @@ test_that("print redacts the token", {
   expect_false(any(grepl("pat_secret", out)))
 })
 
-test_that("unimplemented verbs raise the skeleton error", {
+test_that("not-yet-implemented verbs raise the skeleton error", {
   con <- vmx_client(base_url = "https://example.test", token = "pat_abc")
-  expect_error(vmx_treatments(client = con), class = "vmx_unimplemented_error")
+  expect_error(vmx_model_catalog(client = con), class = "vmx_unimplemented_error")
 })

@@ -20,7 +20,57 @@ vmx_upload <- function(study, files,
                        treatment = NULL, config = NULL, wait = FALSE,
                        client = vmx_client()) {
   mode <- match.arg(mode)
-  vmx_abort_unimplemented("vmx_upload()")
+  std_id <- vmx_id(study, "std", arg = "study")
+  tmt_id <- if (!is.null(treatment)) {
+    vmx_id(treatment, "tmt", arg = "treatment")
+  } else {
+    vmx_study_treatment_id(study, client)
+  }
+
+  missing <- files[!file.exists(files)]
+  if (length(missing)) {
+    vmx_abort(
+      sprintf("File(s) not found: %s", paste(missing, collapse = ", ")),
+      class = "vmx_usage_error"
+    )
+  }
+
+  parts <- list(treatment_id = tmt_id, study_id = std_id, mode = mode)
+  if (!is.null(config)) {
+    parts$config_yaml <- curl::form_file(config, type = "application/yaml")
+  }
+  # Repeated `files` form field — a list with duplicate names, spliced in.
+  file_parts <- stats::setNames(
+    lapply(files, function(p) curl::form_file(p, type = "application/octet-stream")),
+    rep("files", length(files))
+  )
+
+  req <- httr2::req_method(vmx_req(client, "/datasets"), "POST") |>
+    httr2::req_body_multipart(!!!parts, !!!file_parts)
+  ds <- new_vmx_resource(vmx_perform(req), "vmx_dataset", "dataset_id")
+
+  if (isTRUE(wait)) vmx_wait(ds, client = client) else ds
+}
+
+#' Resolve the treatment id that owns a study
+#'
+#' Uses the object's `treatment_id` when `study` is a `vmx_study`/`vmx_dataset`,
+#' otherwise fetches the study.
+#' @keywords internal
+#' @noRd
+vmx_study_treatment_id <- function(study, client) {
+  if (inherits(study, "vmx_resource") && !is.null(study[["treatment_id"]])) {
+    return(study[["treatment_id"]])
+  }
+  std_id <- vmx_id(study, "std", arg = "study")
+  tmt_id <- vmx_get(client, paste0("/studies/", std_id))[["treatment_id"]]
+  if (is.null(tmt_id)) {
+    vmx_abort(
+      sprintf("Could not resolve the treatment for study '%s'; pass `treatment=`.", std_id),
+      class = "vmx_usage_error"
+    )
+  }
+  tmt_id
 }
 
 #' List datasets
