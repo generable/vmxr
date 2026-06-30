@@ -1,0 +1,11 @@
+^vmxr\.Rproj$
+^\.Rproj\.user$
+^LICENSE\.md$
+^README\.Rmd$
+^\.github$
+^pkgdown$
+^_pkgdown\.yml$
+^docs$
+^data-raw$
+^\.git$
+^\.gitignore$

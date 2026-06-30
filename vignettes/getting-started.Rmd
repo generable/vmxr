@@ -1,0 +1,51 @@
+---
+title: "Getting started with vmxr"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting started with vmxr}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```
+
+`vmxr` is a native R client for the VeloMetrix API. It collapses the
+upload &rarr; prep &rarr; data-version &rarr; NCA / modeling / simulation
+workflow into a few pipe-friendly verbs that block-and-poll for you and return
+tibbles and typed S3 objects.
+
+> This package is an early skeleton. The functions below describe the intended
+> surface; most are not implemented yet.
+
+## Authentication
+
+`vmxr` uses the same mental model as the CLI: a base URL and an Authentik PAT,
+read from the environment (or `~/.Renviron`).
+
+```{r}
+# ~/.Renviron
+# VMX_API_BASE_URL=https://vmx-api.staging.gnrbl.co
+# VMX_API_TOKEN=pat_...
+
+library(vmxr)
+vmx_whoami()   # confirms the PAT works
+```
+
+## The whole workflow, in-session
+
+```{r}
+tmt   <- vmx_treatment_create("Compound XYZ", indication = "atrial fibrillation")
+study <- vmx_study_create(tmt, "Phase 1 SAD", phase = "1")
+
+ds <- vmx_upload(study, files = c("conc.csv", "dosing.csv"),
+                 mode = "initial", wait = TRUE)
+
+dv  <- vmx_data_version(vmx_prep_status(ds)$data_version_id)
+nca <- vmx_nca(dv, time_basis = "actual")   # creates + waits
+
+vmx_nca_result(nca)
+```
+
+See the design proposal in `docs/r-client-design.md` for the full intended API.

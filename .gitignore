@@ -1,0 +1,16 @@
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+.Renviron
+
+# build artifacts
+/*.tar.gz
+/*.Rcheck/
+docs/pkgdown/
+inst/doc/
+
+# OS
+.DS_Store

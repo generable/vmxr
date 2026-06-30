@@ -1,0 +1,48 @@
+url: https://github.com/generable/vmxr
+
+template:
+  bootstrap: 5
+
+reference:
+  - title: Connection & identity
+    contents:
+      - vmx_client
+      - vmx_whoami
+      - vmx_health
+  - title: Treatments & studies
+    contents:
+      - starts_with("vmx_treatment")
+      - starts_with("vmx_studies")
+      - starts_with("vmx_study")
+  - title: Datasets & upload
+    contents:
+      - vmx_upload
+      - starts_with("vmx_dataset")
+      - starts_with("vmx_upload_")
+  - title: Prep & data versions
+    contents:
+      - starts_with("vmx_prep")
+      - starts_with("vmx_data_version")
+  - title: Modeling data access
+    contents:
+      - vmx_model_data
+      - vmx_subjects
+      - vmx_pk
+      - vmx_pd
+      - vmx_nlmixr_data
+      - vmx_torsten_data
+  - title: NCA
+    contents:
+      - starts_with("vmx_nca")
+  - title: Modeling
+    contents:
+      - starts_with("vmx_model")
+      - starts_with("vmx_fit_")
+  - title: Simulation
+    contents:
+      - starts_with("vmx_sim")
+      - vmx_dosing_input
+  - title: Async & audit
+    contents:
+      - vmx_wait
+      - vmx_analysis_log

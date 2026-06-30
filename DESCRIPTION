@@ -1,0 +1,37 @@
+Package: vmxr
+Title: VeloMetrix R Client
+Version: 0.0.0.9000
+Authors@R: c(
+    person("Eric", "Novik", , "eric@generable.com", role = c("aut", "cre")),
+    person("Generable", role = c("cph", "fnd")))
+Description: A native R client for the VeloMetrix REST API (vmx-api). Wraps the
+    treatment-to-simulation analysis workflow in ergonomic, pipe-friendly verbs
+    that block-and-poll for asynchronous server jobs and return native R objects
+    (tibbles and typed S3 objects). The package orchestrates server-side jobs;
+    it holds no business logic of its own. Targets API 0.2.x / CLI 0.6.x.
+License: file LICENSE
+URL: https://github.com/generable/vmxr
+BugReports: https://github.com/generable/vmxr/issues
+Depends:
+    R (>= 4.1.0)
+Imports:
+    cli,
+    httr2,
+    jsonlite,
+    rlang,
+    tibble,
+    vctrs
+Suggests:
+    arrow,
+    dplyr,
+    ggplot2,
+    httptest2,
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0),
+    withr
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+Config/roxygen2/version: 8.0.0
