@@ -14,20 +14,21 @@ vmx_nca_analyses(
 )
 }
 \arguments{
-\item{data_version}{Optional data-version filter.}
+\item{data_version}{Optional data-version (\code{dv_...}) filter.}
 
-\item{study}{Optional study filter.}
+\item{study}{Optional study (\code{std_...}) filter.}
 
-\item{treatment}{Optional treatment filter.}
+\item{treatment}{Optional treatment (\code{tmt_...}) filter.}
 
-\item{status}{Optional status filter.}
+\item{status}{Optional status filter (\code{queued}/\code{running}/\code{completed}/
+\code{degraded}/\code{failed}).}
 
 \item{time_basis}{Optional time-basis filter.}
 
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+A tibble, one row per analysis.
 }
 \description{
 List NCA analyses

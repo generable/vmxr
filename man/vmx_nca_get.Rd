@@ -7,7 +7,7 @@
 vmx_nca_get(id, client = vmx_client())
 }
 \arguments{
-\item{id}{An NCA id or \code{vmx_nca_analysis}.}
+\item{id}{An NCA id (\code{nca_...}) or \code{vmx_nca_analysis}.}
 
 \item{client}{A \code{vmx_client}.}
 }
