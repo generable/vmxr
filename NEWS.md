@@ -41,3 +41,9 @@
   `vmx_fit_obs_vs_pred()` and `vmx_fit_vpc()` return the parsed diagnostic
   artifacts as-is for now; reshaping their nested plot bands into tibbles is a
   follow-up.
+* Simulation slice: `vmx_dosing_input()`; `vmx_sim_existing_subject()`,
+  `vmx_sim_hypothetical_subject()`, `vmx_sim_population()` (accept a data.frame
+  of subjects/covariates or explicit records; create + optional `vmx_wait()`);
+  `vmx_sim_status()`, `vmx_sim_result()`, `vmx_sim_cancel()`. `vmx_wait()` gains
+  a simulation-job method (terminal `succeeded`; `failed`/`cancelled` raise).
+  `vmx_sim_result()` returns the parsed result payload (reshaping deferred).
