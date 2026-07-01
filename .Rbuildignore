@@ -9,3 +9,5 @@
 ^data-raw$
 ^\.git$
 ^\.gitignore$
+^doc$
+^Meta$

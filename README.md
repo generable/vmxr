@@ -12,13 +12,30 @@ modeling &rarr; simulation workflow in ergonomic, pipe-friendly verbs that
 Our users are pharmacometricians who work in R/RStudio; `vmxr` keeps the whole
 analysis next to their data instead of shuttling files and IDs through a shell.
 
-> **Status: early skeleton.** The package layout, public API surface, and design
-> are in place; most verbs are stubs that raise a "not implemented" error. See
-> [`docs/r-client-design.md`](docs/r-client-design.md) for the full design
-> proposal, including the modeling data-access layer (nlmixr2 / Stan·Torsten)
-> and the deployment plan for the RStudio/coder workspace.
+> **Status: functional (v0.1.0), pre-CRAN.** The client covers the full analysis
+> workflow end to end — treatments, studies, datasets & prep, data-versions,
+> modeling-data tables, NCA, modeling (build runs, fits, estimates), simulation,
+> and the study analysis log — validated against the live API on staging.
+> Deferred: the nlmixr2 / Stan·Torsten data adapters (`vmx_nlmixr_data()`,
+> `vmx_torsten_data()`), `vmx_dataset_download()`, and VPC-artifact tibble
+> reshaping — each needs validation against real data first and currently raises
+> a clear "not implemented" error. See [`docs/r-client-design.md`](docs/r-client-design.md)
+> for the full design and the RStudio/coder deployment plan.
 
 Targets **API `0.2.x` / CLI `0.6.x`**.
+
+## What you can do
+
+| Area | Verbs |
+| --- | --- |
+| Connect / identity | `vmx_client()`, `vmx_whoami()`, `vmx_health()` |
+| Treatments / studies | `vmx_treatments()`, `vmx_study_create()`, … |
+| Upload & prep | `vmx_upload()`, `vmx_prep_status()`, `vmx_prep_questions()`, `vmx_prep_answer()`, `vmx_wait()` |
+| Data versions | `vmx_data_versions()`, `vmx_data_version_create()`, `vmx_data_version_table()`, `vmx_subjects()`/`vmx_pk()`/`vmx_pd()`, `vmx_model_data()` |
+| NCA | `vmx_nca()`, `vmx_nca_result()` |
+| Modeling | `vmx_model_build()`, `vmx_model_fits()`, `vmx_fit_subject_estimates()`, `vmx_fit_global_estimates()`, `vmx_fit_obs_vs_pred()` |
+| Simulation | `vmx_dosing_input()`, `vmx_sim_population()`, `vmx_sim_result()` |
+| Audit | `vmx_analysis_log()` |
 
 ## Installation
 
