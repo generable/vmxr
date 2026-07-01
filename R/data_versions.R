@@ -55,13 +55,24 @@ vmx_data_version_create <- function(dataset, uploads, prior_config = NULL,
   new_vmx_resource(data, "vmx_prep_status", "dataset_id")
 }
 
-#' The curated data-version table
-#' @param dv A data-version id or `vmx_data_version`.
+#' A prepared data-version table
+#'
+#' `GET /data-versions/{id}/tables/{domain}` — returns the formatter's prepared
+#' `domain` table as a tibble (columns typed per the server's column metadata,
+#' which is attached as the `"columns"` attribute). `gen_subject_uuid` is the
+#' canonical subject join key.
+#'
+#' @param dv A data-version id (`dv_...`) or `vmx_data_version`.
+#' @param domain One of `"subjects"`, `"pk"`, `"dosing"`, `"pd"`, `"labs"`,
+#'   `"covariates"`.
 #' @param client A `vmx_client`.
 #' @return A tibble.
 #' @export
-vmx_data_version_table <- function(dv, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_data_version_table()")
+vmx_data_version_table <- function(dv, domain = c("subjects", "pk", "dosing", "pd", "labs", "covariates"),
+                                   client = vmx_client()) {
+  domain <- match.arg(domain)
+  tbl <- vmx_get(client, paste0("/data-versions/", vmx_id(dv, "dv"), "/tables/", domain))
+  vmx_dvtable_to_tibble(tbl)
 }
 
 #' Export a data version
@@ -120,70 +131,94 @@ vmx_set_dv_archive <- function(dv, archived, reason, client) {
 
 # ---- Modeling data access (nlmixr2 / Stan-Torsten) -------------------------
 
+#' Subjects table (one row per subject)
+#' @param dv A data-version id or `vmx_data_version`.
+#' @param client A `vmx_client`.
+#' @return A tibble.
+#' @export
+vmx_subjects <- function(dv, client = vmx_client()) {
+  vmx_data_version_table(dv, "subjects", client = client)
+}
+
+#' PK observations + events table
+#' @param dv A data-version id or `vmx_data_version`.
+#' @param client A `vmx_client`.
+#' @return A tibble.
+#' @export
+vmx_pk <- function(dv, client = vmx_client()) {
+  vmx_data_version_table(dv, "pk", client = client)
+}
+
+#' PD observations table
+#' @param dv A data-version id or `vmx_data_version`.
+#' @param client A `vmx_client`.
+#' @return A tibble.
+#' @export
+vmx_pd <- function(dv, client = vmx_client()) {
+  vmx_data_version_table(dv, "pd", client = client)
+}
+
 #' Fetch model-ready tidy tables for a data version
 #'
-#' Returns a `vmx_model_data` bundle with `$subjects`, `$pk`, `$pd`, and
-#' `$meta` (units, LLOQ, time basis, analyte/marker manifest, id map, content
-#' hash).
+#' Returns a `vmx_model_data` bundle with `$subjects`, `$pk`, `$pd` (each a
+#' tibble, or `NULL` when the DataVersion has no such prepared table), and
+#' `$meta` (units, time bases, PD-marker manifest, subject count) read from the
+#' DataVersion. Only domains flagged in the DV's `table_availability` are
+#' fetched, so absent optional tables don't 404.
 #'
 #' @param dv A data-version id or `vmx_data_version`.
 #' @param client A `vmx_client`.
 #' @return A `vmx_model_data` object.
 #' @export
 vmx_model_data <- function(dv, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_model_data()")
+  dv_obj <- if (inherits(dv, "vmx_data_version")) dv else vmx_data_version(vmx_id(dv, "dv"), client = client)
+  avail <- dv_obj$table_availability %||% list()
+  fetch <- function(domain) {
+    if (isTRUE(avail[[domain]])) vmx_data_version_table(dv_obj, domain, client = client) else NULL
+  }
+  structure(
+    list(
+      subjects = fetch("subjects"),
+      pk = fetch("pk"),
+      pd = fetch("pd"),
+      meta = list(
+        data_version_id = dv_obj$data_version_id,
+        units = dv_obj$units,
+        time_bases = dv_obj$time_bases,
+        recommended_time_basis = dv_obj$recommended_time_basis,
+        pd_markers = dv_obj$pd_markers,
+        n_subjects = dv_obj$n_subjects,
+        table_availability = avail
+      )
+    ),
+    class = "vmx_model_data"
+  )
 }
 
-#' Subjects table
-#' @param dv A data-version id or `vmx_data_version`.
-#' @param client A `vmx_client`.
-#' @return A tibble, one row per subject.
 #' @export
-vmx_subjects <- function(dv, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_subjects()")
-}
-
-#' PK observations and events
-#' @param dv A data-version id or `vmx_data_version`.
-#' @param analyte Optional analyte filter.
-#' @param format `"tidy"` or `"nonmem"`.
-#' @param blq Censoring scheme: `"flag"`, `"drop"`, `"loq_half"`, or `"m3"`.
-#' @param units `"as_reported"` or `"si"`.
-#' @param time_basis `"actual"` or `"nominal"`.
-#' @param client A `vmx_client`.
-#' @return A tibble.
-#' @export
-vmx_pk <- function(dv, analyte = NULL,
-                   format = c("tidy", "nonmem"),
-                   blq = c("flag", "drop", "loq_half", "m3"),
-                   units = c("as_reported", "si"),
-                   time_basis = c("actual", "nominal"),
-                   client = vmx_client()) {
-  format <- match.arg(format)
-  blq <- match.arg(blq)
-  units <- match.arg(units)
-  time_basis <- match.arg(time_basis)
-  vmx_abort_unimplemented("vmx_pk()")
-}
-
-#' PD observations
-#' @param dv A data-version id or `vmx_data_version`.
-#' @param marker Optional PD marker filter.
-#' @param format `"tidy"` or `"nonmem"`.
-#' @param client A `vmx_client`.
-#' @return A tibble.
-#' @export
-vmx_pd <- function(dv, marker = NULL, format = c("tidy", "nonmem"),
-                   client = vmx_client()) {
-  format <- match.arg(format)
-  vmx_abort_unimplemented("vmx_pd()")
+print.vmx_model_data <- function(x, ...) {
+  cli::cli_text("{.cls <vmx_model_data>} {x$meta$data_version_id %||% ''}")
+  dims <- function(t) if (is.null(t)) "-" else paste0(nrow(t), "x", ncol(t))
+  cli::cli_bullets(c(
+    "*" = "subjects: {dims(x$subjects)}",
+    "*" = "pk: {dims(x$pk)}",
+    "*" = "pd: {dims(x$pd)}"
+  ))
+  invisible(x)
 }
 
 #' NONMEM-layout data.frame for nlmixr2 / rxode2
+#'
+#' Not yet implemented. Assembling the NONMEM/`nlmixr2` layout
+#' (ID/TIME/DV/AMT/EVID/CMT/MDV/RATE/II/ADDL/SS + covariates) from the `pk` and
+#' `dosing` domain tables requires the DataVersion column/manifest contract to
+#' be pinned and validated against real data; see the package NEWS. Use
+#' [vmx_pk()] / [vmx_data_version_table()] for the tidy tables today.
+#'
 #' @param dv A data-version id or `vmx_data_version`.
 #' @param analyte Analyte to assemble.
 #' @param client A `vmx_client`.
-#' @return A data.frame ready for `nlmixr2()`.
+#' @return Not yet implemented.
 #' @export
 vmx_nlmixr_data <- function(dv, analyte = NULL, client = vmx_client()) {
   vmx_abort_unimplemented("vmx_nlmixr_data()")
@@ -191,13 +226,15 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, client = vmx_client()) {
 
 #' Ragged-array data list for Stan / Torsten
 #'
-#' Assembles the per-subject `start[i]`/`end[i]` index ranges and the `iObs`
-#' observation index that Torsten expects.
+#' Not yet implemented. The per-subject `start[i]`/`end[i]` index ranges and
+#' `iObs` observation index must be derived and verified against real data
+#' before shipping (this is the error-prone derivation the design flags); see
+#' the package NEWS.
 #'
 #' @param dv A data-version id or `vmx_data_version`.
 #' @param analyte Analyte to assemble.
 #' @param client A `vmx_client`.
-#' @return A named list suitable for `cmdstanr`'s `data=`.
+#' @return Not yet implemented.
 #' @export
 vmx_torsten_data <- function(dv, analyte = NULL, client = vmx_client()) {
   vmx_abort_unimplemented("vmx_torsten_data()")

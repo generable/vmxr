@@ -59,6 +59,34 @@ vmx_id <- function(x, prefix = NULL, arg = "id") {
   id
 }
 
+#' Convert a `DvTable` envelope (columns + row-objects) into a typed tibble
+#'
+#' Coerces each column per the server-declared type; column metadata is kept on
+#' the `"columns"` attribute.
+#' @keywords internal
+#' @noRd
+vmx_dvtable_to_tibble <- function(tbl) {
+  cols <- tbl$columns %||% list()
+  rows <- tbl$rows %||% list()
+  names_ <- vapply(cols, function(col) col$name, character(1))
+  data <- lapply(cols, function(col) vmx_coerce_col(lapply(rows, function(r) r[[col$name]]), col$type))
+  out <- tibble::as_tibble(stats::setNames(data, names_))
+  attr(out, "columns") <- cols
+  out
+}
+
+# Coerce a list of parsed cell values to a typed vector (server type -> R type).
+vmx_coerce_col <- function(vals, type) {
+  is_na <- function(x) is.null(x) || length(x) == 0
+  switch(
+    type %||% "string",
+    number = ,
+    integer = vapply(vals, function(x) if (is_na(x)) NA_real_ else as.numeric(x), numeric(1)),
+    boolean = vapply(vals, function(x) if (is_na(x)) NA else as.logical(x), logical(1)),
+    vapply(vals, function(x) if (is_na(x)) NA_character_ else as.character(x), character(1))
+  )
+}
+
 #' Resolve an optional id argument (`NULL` passes through)
 #' @keywords internal
 #' @noRd

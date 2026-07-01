@@ -15,7 +15,9 @@ vmx_model_data(dv, client = vmx_client())
 A \code{vmx_model_data} object.
 }
 \description{
-Returns a \code{vmx_model_data} bundle with \verb{$subjects}, \verb{$pk}, \verb{$pd}, and
-\verb{$meta} (units, LLOQ, time basis, analyte/marker manifest, id map, content
-hash).
+Returns a \code{vmx_model_data} bundle with \verb{$subjects}, \verb{$pk}, \verb{$pd} (each a
+tibble, or \code{NULL} when the DataVersion has no such prepared table), and
+\verb{$meta} (units, time bases, PD-marker manifest, subject count) read from the
+DataVersion. Only domains flagged in the DV's \code{table_availability} are
+fetched, so absent optional tables don't 404.
 }

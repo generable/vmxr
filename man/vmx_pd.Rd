@@ -2,16 +2,12 @@
 % Please edit documentation in R/data_versions.R
 \name{vmx_pd}
 \alias{vmx_pd}
-\title{PD observations}
+\title{PD observations table}
 \usage{
-vmx_pd(dv, marker = NULL, format = c("tidy", "nonmem"), client = vmx_client())
+vmx_pd(dv, client = vmx_client())
 }
 \arguments{
 \item{dv}{A data-version id or \code{vmx_data_version}.}
-
-\item{marker}{Optional PD marker filter.}
-
-\item{format}{\code{"tidy"} or \code{"nonmem"}.}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -19,5 +15,5 @@ vmx_pd(dv, marker = NULL, format = c("tidy", "nonmem"), client = vmx_client())
 A tibble.
 }
 \description{
-PD observations
+PD observations table
 }
