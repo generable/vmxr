@@ -80,7 +80,11 @@ vmx_study_treatment_id <- function(study, client) {
 #' @return A tibble.
 #' @export
 vmx_datasets <- function(study = NULL, treatment = NULL, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_datasets()")
+  params <- list(
+    study_id = vmx_opt_id(study, "std", "study"),
+    treatment_id = vmx_opt_id(treatment, "tmt", "treatment")
+  )
+  vmx_items_to_tibble(vmx_paginate(client, "/datasets", params))
 }
 
 #' Fetch one dataset
@@ -89,7 +93,8 @@ vmx_datasets <- function(study = NULL, treatment = NULL, client = vmx_client()) 
 #' @return A `vmx_dataset`.
 #' @export
 vmx_dataset <- function(id, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_dataset()")
+  data <- vmx_get(client, paste0("/datasets/", vmx_id(id, "ds")))
+  new_vmx_resource(data, "vmx_dataset", "dataset_id")
 }
 
 #' List the files in a dataset
