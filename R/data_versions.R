@@ -12,7 +12,13 @@ vmx_data_versions <- function(treatment = NULL, study = NULL,
                               include_archived = FALSE,
                               eligible_for_modeling = NULL,
                               client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_data_versions()")
+  params <- list(
+    treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
+    study_id = vmx_opt_id(study, "std", "study"),
+    include_archived = include_archived,
+    eligible_for_modeling = eligible_for_modeling
+  )
+  vmx_items_to_tibble(vmx_paginate(client, "/data-versions", params))
 }
 
 #' Fetch one data version
@@ -21,19 +27,32 @@ vmx_data_versions <- function(treatment = NULL, study = NULL,
 #' @return A `vmx_data_version`.
 #' @export
 vmx_data_version <- function(id, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_data_version()")
+  data <- vmx_get(client, paste0("/data-versions/", vmx_id(id, "dv")))
+  new_vmx_resource(data, "vmx_data_version", "data_version_id")
 }
 
 #' Create a data version
-#' @param dataset A dataset id or `vmx_dataset`.
-#' @param uploads Uploads to include.
-#' @param prior_config Optional prior config for warm-start.
+#'
+#' Starts a format job over an explicit upload composition
+#' (`POST /datasets/{ds_id}/data-versions`). Returns the in-flight prep-status;
+#' poll it with [vmx_wait()].
+#'
+#' @param dataset A dataset id (`ds_...`) or `vmx_dataset`.
+#' @param uploads Character vector of upload ids (`upl_...`) to format over.
+#' @param prior_config Optional prior data-version (`dv_...`) whose config seeds
+#'   this job (the config-update lineage pointer).
 #' @param client A `vmx_client`.
-#' @return A `vmx_data_version`.
+#' @return A `vmx_prep_status` for the new job.
 #' @export
 vmx_data_version_create <- function(dataset, uploads, prior_config = NULL,
                                     client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_data_version_create()")
+  body <- vmx_compact(list(
+    upload_ids = as.list(uploads),
+    prior_config_data_version_id = vmx_opt_id(prior_config, "dv", "prior_config")
+  ))
+  data <- vmx_post(client, paste0("/datasets/", vmx_id(dataset, "ds", "dataset"),
+                                  "/data-versions"), body)
+  new_vmx_resource(data, "vmx_prep_status", "dataset_id")
 }
 
 #' The curated data-version table
@@ -46,28 +65,57 @@ vmx_data_version_table <- function(dv, client = vmx_client()) {
 }
 
 #' Export a data version
+#'
+#' Fetches the signed-URL export envelope (`GET /data-versions/{id}/export`).
+#' When `dest` is supplied the bundle is streamed to that path; otherwise the
+#' parsed envelope (including the signed `download_url`) is returned.
+#'
 #' @param dv A data-version id or `vmx_data_version`.
-#' @param dest Optional destination; when `NULL`, returns the data.
+#' @param dest Optional local file path to stream the bundle to.
 #' @param client A `vmx_client`.
+#' @return The export envelope (list), or, when `dest` is set, `dest` invisibly.
 #' @export
 vmx_data_version_export <- function(dv, dest = NULL, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_data_version_export()")
+  envelope <- vmx_get(client, paste0("/data-versions/", vmx_id(dv, "dv"), "/export"))
+  if (is.null(dest)) {
+    return(envelope)
+  }
+  url <- envelope$download_url %||% envelope$url
+  if (is.null(url)) {
+    vmx_abort("Export envelope did not contain a download URL.", class = "vmx_api_error")
+  }
+  # Anonymous request: the signed URL carries its own credentials; sending the
+  # API bearer to GCS would leak the token and is rejected anyway.
+  httr2::request(url) |>
+    httr2::req_perform(path = dest)
+  invisible(dest)
 }
 
 #' Archive a data version
 #' @param dv A data-version id or `vmx_data_version`.
+#' @param reason Optional free-text reason.
 #' @param client A `vmx_client`.
+#' @return The updated `vmx_data_version`.
 #' @export
-vmx_data_version_archive <- function(dv, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_data_version_archive()")
+vmx_data_version_archive <- function(dv, reason = NULL, client = vmx_client()) {
+  vmx_set_dv_archive(dv, TRUE, reason, client)
 }
 
 #' Unarchive a data version
 #' @param dv A data-version id or `vmx_data_version`.
 #' @param client A `vmx_client`.
+#' @return The updated `vmx_data_version`.
 #' @export
 vmx_data_version_unarchive <- function(dv, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_data_version_unarchive()")
+  vmx_set_dv_archive(dv, FALSE, NULL, client)
+}
+
+#' @keywords internal
+#' @noRd
+vmx_set_dv_archive <- function(dv, archived, reason, client) {
+  body <- vmx_compact(list(archived = archived, reason = reason))
+  data <- vmx_patch(client, paste0("/data-versions/", vmx_id(dv, "dv"), "/archive"), body)
+  new_vmx_resource(data, "vmx_data_version", "data_version_id")
 }
 
 # ---- Modeling data access (nlmixr2 / Stan-Torsten) -------------------------

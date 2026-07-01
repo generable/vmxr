@@ -9,10 +9,15 @@ vmx_data_version_export(dv, dest = NULL, client = vmx_client())
 \arguments{
 \item{dv}{A data-version id or \code{vmx_data_version}.}
 
-\item{dest}{Optional destination; when \code{NULL}, returns the data.}
+\item{dest}{Optional local file path to stream the bundle to.}
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+The export envelope (list), or, when \code{dest} is set, \code{dest} invisibly.
+}
 \description{
-Export a data version
+Fetches the signed-URL export envelope (\code{GET /data-versions/{id}/export}).
+When \code{dest} is supplied the bundle is streamed to that path; otherwise the
+parsed envelope (including the signed \code{download_url}) is returned.
 }

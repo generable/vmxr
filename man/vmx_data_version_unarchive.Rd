@@ -11,6 +11,9 @@ vmx_data_version_unarchive(dv, client = vmx_client())
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+The updated \code{vmx_data_version}.
+}
 \description{
 Unarchive a data version
 }
