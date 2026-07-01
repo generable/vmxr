@@ -10,8 +10,10 @@ vmx_health(client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-\code{TRUE} on success, otherwise a classed error.
+Invisibly, a \code{vmx_health} object (\code{status}, \code{version},
+\code{api_contract_version}, \code{engine}, \code{engine_version}); raises a classed error
+if the API is unreachable or unhealthy.
 }
 \description{
-Connectivity probe
+Calls \code{GET /health}.
 }

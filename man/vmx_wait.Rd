@@ -15,17 +15,18 @@ vmx_wait(
 )
 }
 \arguments{
-\item{x}{A pollable handle: dataset, data-version, model-build-run, or
-simulation-job.}
+\item{x}{A pollable handle: a dataset / prep-status (more types as the API
+surface lands: model-build-run, simulation-job).}
 
 \item{until}{Target terminal state(s); a sensible default per type when
 \code{NULL}.}
 
 \item{timeout}{Timeout in seconds.}
 
-\item{interval}{Poll interval in seconds (backoff capped at \code{interval}).}
+\item{interval}{Poll interval in seconds (exponential backoff up to 30s).}
 
-\item{progress}{Show a progress bar; defaults to \code{\link[=interactive]{interactive()}}.}
+\item{progress}{Show a progress message each poll; defaults to
+\code{\link[=interactive]{interactive()}}.}
 
 \item{client}{A \code{vmx_client}.}
 
@@ -36,7 +37,6 @@ The updated object, or a \code{vmx_timeout_error}.
 }
 \description{
 An S3 generic dispatching on the handle type. Each method has a sensible
-default terminal state (dataset -> \code{formatted}/\code{awaiting_input};
-model-build-run -> \code{succeeded}/\code{failed}; sim-job -> \code{succeeded}/\code{failed}).
-Terminal-but-unsuccessful states raise a classed error.
+default terminal state. Terminal-but-unsuccessful states raise a classed
+error so scripts fail loudly rather than hang.
 }

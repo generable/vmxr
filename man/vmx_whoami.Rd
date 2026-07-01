@@ -10,8 +10,9 @@ vmx_whoami(client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A list with the authenticated user, email, and related fields.
+A \code{vmx_me} object: \code{user_id}, \code{email}, \code{name}, \code{workspace_id},
+\code{roles}, and \code{counts}.
 }
 \description{
-Confirm the configured PAT and report identity
+Calls \code{GET /me}.
 }
