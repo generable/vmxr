@@ -13,13 +13,7 @@ vmx_model_build_runs(
 )
 }
 \arguments{
-\item{data_version}{Optional filter.}
-
-\item{study}{Optional filter.}
-
-\item{treatment}{Optional filter.}
-
-\item{status}{Optional status filter.}
+\item{data_version, study, treatment, status}{Optional filters.}
 
 \item{client}{A \code{vmx_client}.}
 }

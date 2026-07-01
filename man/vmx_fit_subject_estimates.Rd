@@ -2,7 +2,7 @@
 % Please edit documentation in R/modeling.R
 \name{vmx_fit_subject_estimates}
 \alias{vmx_fit_subject_estimates}
-\title{Subject-level parameter estimates}
+\title{Subject-level parameter estimates (tidy, long)}
 \usage{
 vmx_fit_subject_estimates(fit, client = vmx_client())
 }
@@ -15,5 +15,6 @@ vmx_fit_subject_estimates(fit, client = vmx_client())
 A tibble.
 }
 \description{
-Subject-level parameter estimates
+One row per subject x parameter, with the posterior point estimate (\code{value})
+and credible interval (\code{ci_lower}/\code{ci_upper}).
 }

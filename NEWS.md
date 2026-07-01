@@ -27,3 +27,17 @@
   `vmx_wait()` gains an NCA method (terminal `completed`/`degraded` succeed,
   `failed` raises). The status poller is refactored into a generic
   `vmx_poll_status()` shared by the dataset and NCA waiters.
+* Modeling slice: `vmx_model_catalog()` (categories flattened to a tibble),
+  `vmx_model_describe()`, `vmx_modeling_options()`; `vmx_model_build()` (parses
+  the `"GEN_uuid:increasing"` pd-marker shorthand, create + optional
+  `vmx_wait()`), `vmx_model_build_runs()` / `_status()` / `_results()` /
+  `_logs()` / `_export()` / `_report()` / `_cancel()`; and fits:
+  `vmx_model_fits()`, `vmx_model_fit()` (details), `vmx_fit_subject_estimates()`
+  and `vmx_fit_global_estimates()` (reshaped to tidy tibbles with point
+  estimate + credible interval). `vmx_wait()` gains a model-build-run method
+  (terminal `succeeded`/`degraded` succeed; `failed`/`cancelled` raise). The
+  `vmx_nca()` / `vmx_model_build()` `wait = TRUE` paths now forward polling
+  controls (`timeout`/`interval`/`progress`) to `vmx_wait()`.
+  `vmx_fit_obs_vs_pred()` and `vmx_fit_vpc()` return the parsed diagnostic
+  artifacts as-is for now; reshaping their nested plot bands into tibbles is a
+  follow-up.

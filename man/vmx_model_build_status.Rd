@@ -7,7 +7,7 @@
 vmx_model_build_status(run, client = vmx_client())
 }
 \arguments{
-\item{run}{A build-run id or object.}
+\item{run}{A build-run id (\code{run_...}) or object.}
 
 \item{client}{A \code{vmx_client}.}
 }

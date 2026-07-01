@@ -2,7 +2,7 @@
 % Please edit documentation in R/modeling.R
 \name{vmx_fit_vpc}
 \alias{vmx_fit_vpc}
-\title{Visual predictive check}
+\title{Visual predictive check artifact}
 \usage{
 vmx_fit_vpc(fit, client = vmx_client())
 }
@@ -12,8 +12,9 @@ vmx_fit_vpc(fit, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A ggplot-ready tibble.
+A list (the parsed artifact).
 }
 \description{
-Visual predictive check
+Returns the parsed VPC artifact (per dose-group and per-subject quantile
+bands over time grids). Tibble reshaping is deferred; see the package NEWS.
 }

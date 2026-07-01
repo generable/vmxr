@@ -2,7 +2,7 @@
 % Please edit documentation in R/modeling.R
 \name{vmx_model_build_events}
 \alias{vmx_model_build_events}
-\title{Build-run events}
+\title{Build-run events (SSE stream)}
 \usage{
 vmx_model_build_events(run, client = vmx_client())
 }
@@ -12,8 +12,8 @@ vmx_model_build_events(run, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+Not yet implemented.
 }
 \description{
-Build-run events
+Build-run events (SSE stream)
 }

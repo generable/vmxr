@@ -14,15 +14,7 @@ vmx_model_fits(
 )
 }
 \arguments{
-\item{run}{Optional build-run filter.}
-
-\item{data_version}{Optional data-version filter.}
-
-\item{model_type}{Optional model-type filter.}
-
-\item{marker_name}{Optional marker filter.}
-
-\item{status}{Optional status filter.}
+\item{run, data_version, model_type, marker_name, status}{Optional filters.}
 
 \item{client}{A \code{vmx_client}.}
 }

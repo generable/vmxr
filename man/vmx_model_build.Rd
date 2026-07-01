@@ -12,17 +12,18 @@ vmx_model_build(
   idempotency_key = NULL,
   retried_from = NULL,
   wait = FALSE,
+  ...,
   client = vmx_client()
 )
 }
 \arguments{
 \item{data_version}{A data-version id or \code{vmx_data_version}.}
 
-\item{time_basis}{\code{"actual"} or \code{"nominal"}.}
+\item{time_basis}{Time basis.}
 
-\item{pd_marker}{Optional \code{"GEN_UUID:increasing"} / \code{":decreasing"}.}
+\item{pd_marker}{Optional \code{"GEN_uuid:increasing"} / \code{":decreasing"} string(s).}
 
-\item{covariate}{Optional covariate(s).}
+\item{covariate}{Optional covariate name(s).}
 
 \item{idempotency_key}{Optional idempotency key.}
 
@@ -30,11 +31,15 @@ vmx_model_build(
 
 \item{wait}{If \code{TRUE}, block until the run settles.}
 
+\item{...}{Polling controls forwarded to \code{\link[=vmx_wait]{vmx_wait()}} when \code{wait = TRUE}
+(e.g. \code{timeout}, \code{interval}, \code{progress}).}
+
 \item{client}{A \code{vmx_client}.}
 }
 \value{
 A \code{vmx_model_build_run}.
 }
 \description{
-Start a model build run (optionally wait)
+\code{pd_marker} uses the design's \code{"GEN_uuid:increasing"} / \code{":decreasing"}
+shorthand; it is parsed into the API's \verb{\{gen_uuid, direction\}} form.
 }
