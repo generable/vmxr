@@ -14,9 +14,11 @@ vmx_torsten_data(dv, analyte = NULL, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A named list suitable for \code{cmdstanr}'s \verb{data=}.
+Not yet implemented.
 }
 \description{
-Assembles the per-subject \code{start[i]}/\code{end[i]} index ranges and the \code{iObs}
-observation index that Torsten expects.
+Not yet implemented. The per-subject \code{start[i]}/\code{end[i]} index ranges and
+\code{iObs} observation index must be derived and verified against real data
+before shipping (this is the error-prone derivation the design flags); see
+the package NEWS.
 }

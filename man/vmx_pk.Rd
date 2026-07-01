@@ -2,30 +2,12 @@
 % Please edit documentation in R/data_versions.R
 \name{vmx_pk}
 \alias{vmx_pk}
-\title{PK observations and events}
+\title{PK observations + events table}
 \usage{
-vmx_pk(
-  dv,
-  analyte = NULL,
-  format = c("tidy", "nonmem"),
-  blq = c("flag", "drop", "loq_half", "m3"),
-  units = c("as_reported", "si"),
-  time_basis = c("actual", "nominal"),
-  client = vmx_client()
-)
+vmx_pk(dv, client = vmx_client())
 }
 \arguments{
 \item{dv}{A data-version id or \code{vmx_data_version}.}
-
-\item{analyte}{Optional analyte filter.}
-
-\item{format}{\code{"tidy"} or \code{"nonmem"}.}
-
-\item{blq}{Censoring scheme: \code{"flag"}, \code{"drop"}, \code{"loq_half"}, or \code{"m3"}.}
-
-\item{units}{\code{"as_reported"} or \code{"si"}.}
-
-\item{time_basis}{\code{"actual"} or \code{"nominal"}.}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -33,5 +15,5 @@ vmx_pk(
 A tibble.
 }
 \description{
-PK observations and events
+PK observations + events table
 }

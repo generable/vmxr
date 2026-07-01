@@ -32,5 +32,5 @@ test_that("print redacts the token", {
 
 test_that("not-yet-implemented verbs raise the skeleton error", {
   con <- vmx_client(base_url = "https://example.test", token = "pat_abc")
-  expect_error(vmx_data_version_table("dv_1", client = con), class = "vmx_unimplemented_error")
+  expect_error(vmx_dataset_download("ds_1", client = con), class = "vmx_unimplemented_error")
 })
