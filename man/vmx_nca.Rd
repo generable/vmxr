@@ -2,18 +2,18 @@
 % Please edit documentation in R/nca.R
 \name{vmx_nca}
 \alias{vmx_nca}
-\title{Create an NCA analysis (optionally wait for it)}
+\title{Run an NCA analysis}
 \usage{
 vmx_nca(data_version, time_basis, ..., wait = TRUE, client = vmx_client())
 }
 \arguments{
-\item{data_version}{A data-version id or \code{vmx_data_version}.}
+\item{data_version}{A data-version id (\code{dv_...}) or \code{vmx_data_version}.}
 
-\item{time_basis}{\code{"actual"} or \code{"nominal"}.}
+\item{time_basis}{The time basis to compute on.}
 
-\item{...}{Additional NCA options.}
+\item{...}{Additional create fields (\code{idempotency_key}, \code{retried_from}).}
 
-\item{wait}{If \code{TRUE}, block until the analysis settles.}
+\item{wait}{If \code{TRUE} (default), block until the analysis is terminal.}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -21,5 +21,8 @@ vmx_nca(data_version, time_basis, ..., wait = TRUE, client = vmx_client())
 A \code{vmx_nca_analysis}.
 }
 \description{
-Create an NCA analysis (optionally wait for it)
+Creates the analysis (\code{POST /nca-analyses}) and, by default, blocks until it
+settles. \code{time_basis} is one of \code{"observed"}, \code{"nominal"}, or
+\code{"nominal_from_observed_dose"} (validated server-side against the
+DataVersion's available bases).
 }
