@@ -2,7 +2,7 @@
 % Please edit documentation in R/nca.R
 \name{vmx_nca_result}
 \alias{vmx_nca_result}
-\title{NCA result table (PK parameters)}
+\title{NCA result table (PK parameters, one row per subject)}
 \usage{
 vmx_nca_result(nca, client = vmx_client())
 }
@@ -15,5 +15,8 @@ vmx_nca_result(nca, client = vmx_client())
 A tibble.
 }
 \description{
-NCA result table (PK parameters)
+Reshapes the \code{point_estimates} payload (metric -> per-subject values, parallel
+to the subject arrays) into a tidy tibble: \code{subject_id}, \code{gen_subject_uuid},
+and one column per PK quantity. The quantity metadata (display names, units,
+explanations) is attached as the \code{"quantities"} attribute.
 }
