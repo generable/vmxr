@@ -1,4 +1,22 @@
-# vmxr 0.0.0.9000
+# vmxr 0.1.0
+
+First broadly functional release: the client now covers the full analysis
+workflow — treatments, studies, datasets/prep, data-versions, modeling-data
+tables, NCA, modeling (build runs + fits + estimates), simulation, and the
+study analysis log — with typed S3 objects, tibble collections, async polling,
+and classed errors, all validated against the real API (staging). Known
+deferred pieces: the nlmixr2/Torsten data adapters, `vmx_dataset_download`, and
+tibble reshaping of the VPC artifact (each needs real-data validation).
+
+* Analysis log: `vmx_analysis_log()` (`GET /studies/{id}/analysis-log`,
+  paginated → tibble; `since` accepts a `POSIXct`/`Date` or ISO-8601 string;
+  `resource` accepts an id or object).
+* Diagnostics: `vmx_fit_obs_vs_pred()` now reshapes the PK observation block
+  into a one-row-per-observation tibble (predicted-concentration bands on the
+  `"extra"` attribute, PD block on `"pd"`). `vmx_fit_vpc()` still returns the
+  parsed nested artifact.
+
+## Development history (0.0.0.9000)
 
 * Initial package skeleton: directory layout, public API surface (stubs),
   `vmx_client()` connection object with redacted-token printing, the

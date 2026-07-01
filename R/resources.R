@@ -87,6 +87,48 @@ vmx_coerce_col <- function(vals, type) {
   )
 }
 
+#' Group the equal-length parallel arrays of a block into a tibble
+#'
+#' Data-driven: columns are the block elements whose length equals the modal
+#' array length (the observation rows); nested / non-conforming elements (e.g.
+#' quantile bands) are returned on the `"extra"` attribute rather than guessed
+#' into columns.
+#' @keywords internal
+#' @noRd
+vmx_columns_to_tibble <- function(block) {
+  if (!is.list(block) || is.null(names(block)) || !length(block)) return(tibble::tibble())
+  col_len <- function(v) {
+    if (is.atomic(v) && !is.null(v)) return(length(v))
+    if (is.list(v) && length(v) && all(vapply(v, function(e) length(e) <= 1, logical(1)))) return(length(v))
+    NA_integer_
+  }
+  lens <- vapply(block, col_len, integer(1))
+  valid <- lens[!is.na(lens) & lens > 0]
+  if (!length(valid)) return(tibble::tibble())
+  modal <- as.integer(names(sort(table(valid), decreasing = TRUE))[[1]])
+  keep <- names(block)[!is.na(lens) & lens == modal]
+  cols <- lapply(keep, function(nm) vmx_simplify_col(block[[nm]]))
+  out <- tibble::as_tibble(stats::setNames(cols, keep))
+  extra <- setdiff(names(block), keep)
+  if (length(extra)) attr(out, "extra") <- block[extra]
+  out
+}
+
+# Coerce an atomic vector or list-of-scalars to a typed vector (NA for nulls).
+vmx_simplify_col <- function(v) {
+  if (is.atomic(v)) return(v)
+  vals <- lapply(v, function(x) if (length(x) == 0) NULL else x[[1]])
+  nonnull <- Filter(Negate(is.null), vals)
+  cls <- if (length(nonnull)) class(nonnull[[1]])[[1]] else "character"
+  if (cls %in% c("numeric", "double", "integer")) {
+    vapply(vals, function(x) if (is.null(x)) NA_real_ else as.numeric(x), numeric(1))
+  } else if (cls == "logical") {
+    vapply(vals, function(x) if (is.null(x)) NA else as.logical(x), logical(1))
+  } else {
+    vapply(vals, function(x) if (is.null(x)) NA_character_ else as.character(x), character(1))
+  }
+}
+
 #' Resolve an optional id argument (`NULL` passes through)
 #' @keywords internal
 #' @noRd

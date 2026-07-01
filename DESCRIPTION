@@ -1,6 +1,6 @@
 Package: vmxr
 Title: VeloMetrix R Client
-Version: 0.0.0.9000
+Version: 0.1.0
 Authors@R: c(
     person("Eric", "Novik", , "eric@generable.com", role = c("aut", "cre")),
     person("Generable", role = c("cph", "fnd")))

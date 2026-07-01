@@ -16,7 +16,7 @@ vmx_analysis_log(
 )
 }
 \arguments{
-\item{study}{A study id or \code{vmx_study}.}
+\item{study}{A study id (\code{std_...}) or \code{vmx_study}.}
 
 \item{kind}{Optional kind filter.}
 
@@ -26,9 +26,10 @@ vmx_analysis_log(
 
 \item{severity}{Optional severity filter.}
 
-\item{since}{Optional lower time bound.}
+\item{since}{Optional lower time bound: a \code{POSIXct}/\code{Date} (formatted to
+ISO-8601 UTC) or an ISO-8601 string.}
 
-\item{resource}{Optional resource filter.}
+\item{resource}{Optional resource id (or object) to scope to.}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -36,5 +37,6 @@ vmx_analysis_log(
 A tibble.
 }
 \description{
-Audit / analysis log for a study
+\code{GET /studies/{std_id}/analysis-log} — the unified newest-first event feed,
+auto-paginated into a tibble with a \code{kind} discriminator per row.
 }

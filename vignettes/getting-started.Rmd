@@ -16,8 +16,8 @@ upload &rarr; prep &rarr; data-version &rarr; NCA / modeling / simulation
 workflow into a few pipe-friendly verbs that block-and-poll for you and return
 tibbles and typed S3 objects.
 
-> This package is an early skeleton. The functions below describe the intended
-> surface; most are not implemented yet.
+> The examples below are not evaluated (they need a live API + token). Set
+> `VMX_API_BASE_URL` / `VMX_API_TOKEN` and run them in your session.
 
 ## Authentication
 
@@ -48,4 +48,29 @@ nca <- vmx_nca(dv, time_basis = "actual")   # creates + waits
 vmx_nca_result(nca)
 ```
 
-See the design proposal in `docs/r-client-design.md` for the full intended API.
+## Model-ready data into R
+
+```{r}
+dv <- vmx_data_version("dv_...")
+
+# tidy domain tables
+vmx_pk(dv)         # PK observations + events
+vmx_subjects(dv)   # one row per subject (covariates)
+
+# or the whole bundle at once
+md <- vmx_model_data(dv)
+md$pk; md$subjects; md$meta
+```
+
+## Fit a model and pull diagnostics
+
+```{r}
+run <- vmx_model_build(dv, time_basis = "observed", wait = TRUE)
+fit <- vmx_model_fits(run = run) |> dplyr::slice(1) |> dplyr::pull(model_fit_id) |> vmx_model_fit()
+
+vmx_fit_global_estimates(fit)   # population parameters + credible intervals
+vmx_fit_obs_vs_pred(fit)        # tidy observed-vs-predicted
+```
+
+See the design proposal in `docs/r-client-design.md` for the full intended API,
+including the planned nlmixr2 / Stan·Torsten adapters.

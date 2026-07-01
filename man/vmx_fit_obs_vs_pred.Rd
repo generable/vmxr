@@ -2,7 +2,7 @@
 % Please edit documentation in R/modeling.R
 \name{vmx_fit_obs_vs_pred}
 \alias{vmx_fit_obs_vs_pred}
-\title{Observed-vs-predicted diagnostic artifact}
+\title{Observed-vs-predicted diagnostic (tidy)}
 \usage{
 vmx_fit_obs_vs_pred(fit, client = vmx_client())
 }
@@ -12,10 +12,12 @@ vmx_fit_obs_vs_pred(fit, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A list (the parsed artifact).
+A tibble (one row per PK observation).
 }
 \description{
-Returns the parsed obs-vs-pred artifact (\code{pk} and \code{pd_markers} blocks of
-parallel arrays plus predicted-quantile bands). Tibble reshaping of the plot
-bands is deferred; see the package NEWS.
+Reshapes the \code{pk} block's parallel observation arrays (subject ids, time,
+observed concentration, BLQ/ALOQ flags, LLOQ, …) into a one-row-per-
+observation tibble. Non-columnar members — notably the predicted-
+concentration quantile bands — are kept on the \code{"extra"} attribute; the PD
+block is on \code{"pd"} and the fit id on \code{"model_fit_id"}.
 }
