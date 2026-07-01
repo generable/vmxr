@@ -7,17 +7,17 @@
 vmx_dosing_input(fit, dosing_text, scenario_name, client = vmx_client())
 }
 \arguments{
-\item{fit}{A fit id or \code{vmx_model_fit}.}
+\item{fit}{A fit id (\code{mf_...}) or \code{vmx_model_fit}.}
 
-\item{dosing_text}{Dosing regimen text.}
+\item{dosing_text}{The dosing regimen text.}
 
-\item{scenario_name}{Scenario label.}
+\item{scenario_name}{One or more scenario names.}
 
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A \code{vmx_dosing_input}.
+A \code{vmx_dosing_input} (carries \code{dosing_input_id}).
 }
 \description{
-Create a dosing input for a fit
+\code{POST /model-fits/{mf_id}/simulation-dosing-inputs}.
 }

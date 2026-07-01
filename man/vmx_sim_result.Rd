@@ -2,18 +2,22 @@
 % Please edit documentation in R/simulation.R
 \name{vmx_sim_result}
 \alias{vmx_sim_result}
-\title{Simulation result table}
+\title{Simulation result}
 \usage{
-vmx_sim_result(job, client = vmx_client())
+vmx_sim_result(job, grouping_variable = NULL, client = vmx_client())
 }
 \arguments{
 \item{job}{A job id or \code{vmx_simulation_job}.}
 
+\item{grouping_variable}{Optional server-side grouping.}
+
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+A list (the parsed result).
 }
 \description{
-Simulation result table
+\code{GET /simulation-jobs/{id}/result}. Returns the parsed result payload
+(subject/time series with prediction bands). Tibble reshaping is deferred
+pending confirmation of the artifact shape; see the package NEWS.
 }

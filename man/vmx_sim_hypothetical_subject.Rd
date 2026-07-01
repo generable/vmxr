@@ -2,16 +2,32 @@
 % Please edit documentation in R/simulation.R
 \name{vmx_sim_hypothetical_subject}
 \alias{vmx_sim_hypothetical_subject}
-\title{Simulate a hypothetical subject}
+\title{Simulate hypothetical subjects}
 \usage{
-vmx_sim_hypothetical_subject(fit, spec, wait = FALSE, client = vmx_client())
+vmx_sim_hypothetical_subject(
+  fit,
+  dosing_input,
+  subjects,
+  idempotency_key = NULL,
+  retried_from = NULL,
+  wait = FALSE,
+  ...,
+  client = vmx_client()
+)
 }
 \arguments{
 \item{fit}{A fit id or \code{vmx_model_fit}.}
 
-\item{spec}{Simulation spec.}
+\item{dosing_input}{A dosing-input id or \code{vmx_dosing_input}.}
+
+\item{subjects}{A data.frame/tibble with a \code{subject_name} column plus one
+column per covariate, or a list of \verb{\{subject_name, covariates\}} records.}
+
+\item{idempotency_key, retried_from}{Optional create fields.}
 
 \item{wait}{If \code{TRUE}, block until the job settles.}
+
+\item{...}{Polling controls forwarded to \code{\link[=vmx_wait]{vmx_wait()}}.}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -19,5 +35,5 @@ vmx_sim_hypothetical_subject(fit, spec, wait = FALSE, client = vmx_client())
 A \code{vmx_simulation_job}.
 }
 \description{
-Simulate a hypothetical subject
+\code{POST /model-fits/{mf_id}/hypothetical-subject-simulation-jobs}.
 }
