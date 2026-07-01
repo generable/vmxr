@@ -10,6 +10,28 @@ capture_one <- function(body) {
   env
 }
 
+test_that("vmx_datasets lists with filters into a tibble", {
+  env <- new.env()
+  httr2::local_mocked_responses(function(req) {
+    env$req <- req
+    httr2::response_json(body = list(
+      items = list(list(dataset_id = "ds_1", status = "formatted")), next_cursor = NULL
+    ))
+  })
+  tbl <- vmx_datasets(study = "std_1", client = con)
+  expect_equal(tbl$dataset_id, "ds_1")
+  expect_match(env$req$url, "study_id=std_1")
+})
+
+test_that("vmx_dataset fetches and types the resource", {
+  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+    dataset_id = "ds_1", status = "formatted", tags = list(name = "run-A")
+  ))))
+  ds <- vmx_dataset("ds_1", client = con)
+  expect_s3_class(ds, "vmx_dataset")
+  expect_equal(vmx_resource_id(ds), "ds_1")
+})
+
 test_that("vmx_dataset_files paginates into a tibble", {
   httr2::local_mocked_responses(list(httr2::response_json(body = list(
     items = list(list(tagged_upload_id = "tu_1", name = "conc.csv", size = 42L)),
