@@ -14,8 +14,9 @@ vmx_dataset_download(dataset, dest = ".", client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-Character vector of written file paths.
+Not yet implemented.
 }
 \description{
-Download a dataset's files
+Not implemented: the API's dataset-files listing does not expose per-file
+download URLs. Use \code{\link[=vmx_data_version_export]{vmx_data_version_export()}} to pull a curated bundle.
 }
