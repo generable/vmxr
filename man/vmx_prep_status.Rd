@@ -7,13 +7,13 @@
 vmx_prep_status(dataset, client = vmx_client())
 }
 \arguments{
-\item{dataset}{A dataset id or \code{vmx_dataset}.}
+\item{dataset}{A dataset id (\code{ds_...}) or \code{vmx_dataset}.}
 
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A \code{vmx_prep_status} (state, \code{data_version_id} when settled).
+A \code{vmx_prep_status} (\code{status}, and \code{data_version_id} once settled).
 }
 \description{
-Prep status for a dataset
+Calls \code{GET /datasets/{ds_id}/prep-status}.
 }

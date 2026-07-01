@@ -16,8 +16,8 @@ Depends:
     R (>= 4.1.0)
 Imports:
     cli,
+    curl,
     httr2,
-    jsonlite,
     rlang,
     tibble,
     vctrs
@@ -26,6 +26,7 @@ Suggests:
     dplyr,
     ggplot2,
     httptest2,
+    jsonlite,
     knitr,
     rmarkdown,
     testthat (>= 3.0.0),

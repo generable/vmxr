@@ -15,8 +15,8 @@
 #' @return An object of class `vmx_client`.
 #' @export
 vmx_client <- function(base_url = NULL, token = NULL, ...) {
-  base_url <- base_url %||% Sys.getenv("VMX_API_BASE_URL", unset = "")
-  token <- token %||% Sys.getenv("VMX_API_TOKEN", unset = "")
+  base_url <- trimws(base_url %||% Sys.getenv("VMX_API_BASE_URL", unset = ""))
+  token <- trimws(token %||% Sys.getenv("VMX_API_TOKEN", unset = ""))
 
   if (!nzchar(base_url)) {
     vmx_abort(

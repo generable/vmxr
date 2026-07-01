@@ -9,7 +9,7 @@ vmx_treatment_update(id, ..., client = vmx_client())
 \arguments{
 \item{id}{A treatment id or \code{vmx_treatment}.}
 
-\item{...}{Fields to update.}
+\item{...}{Fields to update (\code{name}, \code{indication}, \code{description}, \code{status}).}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -17,5 +17,5 @@ vmx_treatment_update(id, ..., client = vmx_client())
 A \code{vmx_treatment}.
 }
 \description{
-Update a treatment
+Only the fields you pass are changed (the server applies \code{exclude_unset}).
 }
