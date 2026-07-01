@@ -2,18 +2,18 @@
 % Please edit documentation in R/modeling.R
 \name{vmx_model_fit}
 \alias{vmx_model_fit}
-\title{Fetch one model fit}
+\title{Fetch one model fit's details}
 \usage{
 vmx_model_fit(id, client = vmx_client())
 }
 \arguments{
-\item{id}{A fit id or \code{vmx_model_fit}.}
+\item{id}{A fit id (\code{mf_...}) or \code{vmx_model_fit}.}
 
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A \code{vmx_model_fit}.
+A \code{vmx_model_fit} (metadata / model / inference).
 }
 \description{
-Fetch one model fit
+Fetch one model fit's details
 }

@@ -2,7 +2,7 @@
 % Please edit documentation in R/modeling.R
 \name{vmx_fit_obs_vs_pred}
 \alias{vmx_fit_obs_vs_pred}
-\title{Observed-vs-predicted diagnostics}
+\title{Observed-vs-predicted diagnostic artifact}
 \usage{
 vmx_fit_obs_vs_pred(fit, client = vmx_client())
 }
@@ -12,8 +12,10 @@ vmx_fit_obs_vs_pred(fit, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A ggplot-ready tibble.
+A list (the parsed artifact).
 }
 \description{
-Observed-vs-predicted diagnostics
+Returns the parsed obs-vs-pred artifact (\code{pk} and \code{pd_markers} blocks of
+parallel arrays plus predicted-quantile bands). Tibble reshaping of the plot
+bands is deferred; see the package NEWS.
 }

@@ -11,6 +11,9 @@ vmx_model_build_cancel(run, client = vmx_client())
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+A \code{vmx_model_build_run}.
+}
 \description{
 Cancel a build run
 }

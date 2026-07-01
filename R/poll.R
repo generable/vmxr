@@ -6,6 +6,8 @@
 .vmx_prep_failed <- c("ineligible", "failed", "cancelled")
 .vmx_nca_success <- c("completed", "degraded")
 .vmx_nca_failed <- c("failed")
+.vmx_build_success <- c("succeeded", "degraded")
+.vmx_build_failed <- c("failed", "cancelled")
 
 #' Block until an async handle reaches a terminal state
 #'
@@ -64,6 +66,15 @@ vmx_wait.vmx_nca_analysis <- function(x, until = NULL, timeout = 900, interval =
   vmx_poll_status(id, function(i) vmx_nca_get(i, client = client),
                   .vmx_nca_success, .vmx_nca_failed,
                   until, timeout, interval, progress, "NCA analysis")
+}
+
+#' @export
+vmx_wait.vmx_model_build_run <- function(x, until = NULL, timeout = 900, interval = 5,
+                                         progress = interactive(), client = vmx_client(), ...) {
+  id <- vmx_id(x, "run", arg = "x")
+  vmx_poll_status(id, function(i) vmx_model_build_status(i, client = client),
+                  .vmx_build_success, .vmx_build_failed,
+                  until, timeout, interval, progress, "Model build run")
 }
 
 #' Generic status poller with exponential backoff

@@ -14,7 +14,7 @@ vmx_model_build_artifacts(run, dest = ".", client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-Character vector of file paths.
+Not yet implemented.
 }
 \description{
 Download build-run artifacts
