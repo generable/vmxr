@@ -15,16 +15,16 @@ vmx_modeling_options(
 \arguments{
 \item{data_version}{A data-version id or \code{vmx_data_version}.}
 
-\item{time_basis}{\code{"actual"} or \code{"nominal"}.}
+\item{time_basis}{Time basis.}
 
-\item{pd_marker}{Optional PD marker.}
+\item{pd_marker}{Optional PD marker gen_uuid(s) (character vector).}
 
-\item{covariate}{Optional covariate(s).}
+\item{covariate}{Optional covariate name(s).}
 
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A list.
+A list (the selection preview).
 }
 \description{
 Preview modeling options for a data version

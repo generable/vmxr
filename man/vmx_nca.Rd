@@ -4,16 +4,27 @@
 \alias{vmx_nca}
 \title{Run an NCA analysis}
 \usage{
-vmx_nca(data_version, time_basis, ..., wait = TRUE, client = vmx_client())
+vmx_nca(
+  data_version,
+  time_basis,
+  idempotency_key = NULL,
+  retried_from = NULL,
+  wait = TRUE,
+  ...,
+  client = vmx_client()
+)
 }
 \arguments{
 \item{data_version}{A data-version id (\code{dv_...}) or \code{vmx_data_version}.}
 
 \item{time_basis}{The time basis to compute on.}
 
-\item{...}{Additional create fields (\code{idempotency_key}, \code{retried_from}).}
+\item{idempotency_key, retried_from}{Optional create fields.}
 
 \item{wait}{If \code{TRUE} (default), block until the analysis is terminal.}
+
+\item{...}{Polling controls forwarded to \code{\link[=vmx_wait]{vmx_wait()}} when \code{wait = TRUE}
+(e.g. \code{timeout}, \code{interval}, \code{progress}).}
 
 \item{client}{A \code{vmx_client}.}
 }

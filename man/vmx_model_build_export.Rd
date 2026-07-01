@@ -11,6 +11,9 @@ vmx_model_build_export(run, client = vmx_client())
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+The export markdown as a length-1 character vector.
+}
 \description{
 Markdown export of a build run
 }
