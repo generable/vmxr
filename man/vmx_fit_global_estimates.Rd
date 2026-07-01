@@ -2,7 +2,7 @@
 % Please edit documentation in R/modeling.R
 \name{vmx_fit_global_estimates}
 \alias{vmx_fit_global_estimates}
-\title{Global (population) parameter estimates}
+\title{Global (population) parameter estimates (tidy)}
 \usage{
 vmx_fit_global_estimates(fit, client = vmx_client())
 }
@@ -15,5 +15,5 @@ vmx_fit_global_estimates(fit, client = vmx_client())
 A tibble.
 }
 \description{
-Global (population) parameter estimates
+One row per parameter, with the point estimate and credible interval.
 }

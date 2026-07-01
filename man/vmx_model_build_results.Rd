@@ -11,6 +11,9 @@ vmx_model_build_results(run, client = vmx_client())
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+A list (fits summary, modeling population, PK structure selection).
+}
 \description{
 Build-run results
 }

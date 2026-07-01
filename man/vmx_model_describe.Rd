@@ -7,12 +7,12 @@
 vmx_model_describe(model_name, client = vmx_client())
 }
 \arguments{
-\item{model_name}{Model name.}
+\item{model_name}{Catalog model name.}
 
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A list / S3 object.
+A named list.
 }
 \description{
 Describe a model

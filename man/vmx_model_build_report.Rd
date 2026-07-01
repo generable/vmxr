@@ -2,7 +2,7 @@
 % Please edit documentation in R/modeling.R
 \name{vmx_model_build_report}
 \alias{vmx_model_build_report}
-\title{Signed HTML report URL for a build run}
+\title{Build-run report status (signed HTML report URL when ready)}
 \usage{
 vmx_model_build_report(run, client = vmx_client())
 }
@@ -11,6 +11,9 @@ vmx_model_build_report(run, client = vmx_client())
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+A list with \code{status} and, when ready, \code{url}.
+}
 \description{
-Signed HTML report URL for a build run
+Build-run report status (signed HTML report URL when ready)
 }

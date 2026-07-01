@@ -11,6 +11,9 @@ vmx_model_build_logs(run, client = vmx_client())
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+A tibble of log lines.
+}
 \description{
 Build-run logs
 }

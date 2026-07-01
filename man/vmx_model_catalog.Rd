@@ -7,7 +7,7 @@
 vmx_model_catalog(data_version = NULL, client = vmx_client())
 }
 \arguments{
-\item{data_version}{Optional data-version filter.}
+\item{data_version}{Optional data-version to tailor the catalog to.}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -15,5 +15,6 @@ vmx_model_catalog(data_version = NULL, client = vmx_client())
 A tibble.
 }
 \description{
-Model catalog
+\code{GET /model-catalog} returns categories of models; this flattens them into
+one tibble with a \code{category} column.
 }

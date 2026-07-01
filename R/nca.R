@@ -32,23 +32,25 @@ vmx_nca_analyses <- function(data_version = NULL, study = NULL, treatment = NULL
 #'
 #' @param data_version A data-version id (`dv_...`) or `vmx_data_version`.
 #' @param time_basis The time basis to compute on.
-#' @param ... Additional create fields (`idempotency_key`, `retried_from`).
+#' @param idempotency_key,retried_from Optional create fields.
 #' @param wait If `TRUE` (default), block until the analysis is terminal.
+#' @param ... Polling controls forwarded to [vmx_wait()] when `wait = TRUE`
+#'   (e.g. `timeout`, `interval`, `progress`).
 #' @param client A `vmx_client`.
 #' @return A `vmx_nca_analysis`.
 #' @export
-vmx_nca <- function(data_version, time_basis, ..., wait = TRUE,
+vmx_nca <- function(data_version, time_basis, idempotency_key = NULL,
+                    retried_from = NULL, wait = TRUE, ...,
                     client = vmx_client()) {
-  body <- vmx_compact(c(
-    list(
-      data_version_id = vmx_id(data_version, "dv", "data_version"),
-      time_basis = time_basis
-    ),
-    list(...)
+  body <- vmx_compact(list(
+    data_version_id = vmx_id(data_version, "dv", "data_version"),
+    time_basis = time_basis,
+    idempotency_key = idempotency_key,
+    retried_from = retried_from
   ))
   nca <- new_vmx_resource(vmx_post(client, "/nca-analyses", body),
                           "vmx_nca_analysis", "nca_id")
-  if (isTRUE(wait)) vmx_wait(nca, client = client) else nca
+  if (isTRUE(wait)) vmx_wait(nca, client = client, ...) else nca
 }
 
 #' Fetch one NCA analysis
