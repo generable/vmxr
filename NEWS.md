@@ -20,3 +20,10 @@
   envelope, optional streamed download). Adds a `vmx_patch()` HTTP helper and
   `vmx_opt_id()` (NULL-passthrough id resolution). The `vmx_data_version_table()`
   and modeling-data adapters (§6.5a) remain stubbed for a dedicated slice.
+* NCA slice: `vmx_nca_analyses()` (data-version/study/treatment/status/time-basis
+  filters), `vmx_nca()` (create + optionally block via `vmx_wait()`),
+  `vmx_nca_get()`, and `vmx_nca_result()` (reshapes `point_estimates` into a tidy
+  one-row-per-subject tibble, quantity metadata on the `"quantities"` attribute).
+  `vmx_wait()` gains an NCA method (terminal `completed`/`degraded` succeed,
+  `failed` raises). The status poller is refactored into a generic
+  `vmx_poll_status()` shared by the dataset and NCA waiters.

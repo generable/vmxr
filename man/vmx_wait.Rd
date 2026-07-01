@@ -15,8 +15,8 @@ vmx_wait(
 )
 }
 \arguments{
-\item{x}{A pollable handle: a dataset / prep-status (more types as the API
-surface lands: model-build-run, simulation-job).}
+\item{x}{A pollable handle: a dataset / prep-status or an NCA analysis (more
+types as the API surface lands: model-build-run, simulation-job).}
 
 \item{until}{Target terminal state(s); a sensible default per type when
 \code{NULL}.}
