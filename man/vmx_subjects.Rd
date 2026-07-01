@@ -2,7 +2,7 @@
 % Please edit documentation in R/data_versions.R
 \name{vmx_subjects}
 \alias{vmx_subjects}
-\title{Subjects table}
+\title{Subjects table (one row per subject)}
 \usage{
 vmx_subjects(dv, client = vmx_client())
 }
@@ -12,8 +12,8 @@ vmx_subjects(dv, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble, one row per subject.
+A tibble.
 }
 \description{
-Subjects table
+Subjects table (one row per subject)
 }

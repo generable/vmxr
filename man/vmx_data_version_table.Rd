@@ -2,12 +2,19 @@
 % Please edit documentation in R/data_versions.R
 \name{vmx_data_version_table}
 \alias{vmx_data_version_table}
-\title{The curated data-version table}
+\title{A prepared data-version table}
 \usage{
-vmx_data_version_table(dv, client = vmx_client())
+vmx_data_version_table(
+  dv,
+  domain = c("subjects", "pk", "dosing", "pd", "labs", "covariates"),
+  client = vmx_client()
+)
 }
 \arguments{
-\item{dv}{A data-version id or \code{vmx_data_version}.}
+\item{dv}{A data-version id (\code{dv_...}) or \code{vmx_data_version}.}
+
+\item{domain}{One of \code{"subjects"}, \code{"pk"}, \code{"dosing"}, \code{"pd"}, \code{"labs"},
+\code{"covariates"}.}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -15,5 +22,8 @@ vmx_data_version_table(dv, client = vmx_client())
 A tibble.
 }
 \description{
-The curated data-version table
+\code{GET /data-versions/{id}/tables/{domain}} — returns the formatter's prepared
+\code{domain} table as a tibble (columns typed per the server's column metadata,
+which is attached as the \code{"columns"} attribute). \code{gen_subject_uuid} is the
+canonical subject join key.
 }

@@ -14,8 +14,12 @@ vmx_nlmixr_data(dv, analyte = NULL, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A data.frame ready for \code{nlmixr2()}.
+Not yet implemented.
 }
 \description{
-NONMEM-layout data.frame for nlmixr2 / rxode2
+Not yet implemented. Assembling the NONMEM/\code{nlmixr2} layout
+(ID/TIME/DV/AMT/EVID/CMT/MDV/RATE/II/ADDL/SS + covariates) from the \code{pk} and
+\code{dosing} domain tables requires the DataVersion column/manifest contract to
+be pinned and validated against real data; see the package NEWS. Use
+\code{\link[=vmx_pk]{vmx_pk()}} / \code{\link[=vmx_data_version_table]{vmx_data_version_table()}} for the tidy tables today.
 }
