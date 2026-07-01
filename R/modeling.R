@@ -292,18 +292,24 @@ vmx_fit_global_estimates <- function(fit, client = vmx_client()) {
   vctrs::vec_rbind(!!!rows)
 }
 
-#' Observed-vs-predicted diagnostic artifact
+#' Observed-vs-predicted diagnostic (tidy)
 #'
-#' Returns the parsed obs-vs-pred artifact (`pk` and `pd_markers` blocks of
-#' parallel arrays plus predicted-quantile bands). Tibble reshaping of the plot
-#' bands is deferred; see the package NEWS.
+#' Reshapes the `pk` block's parallel observation arrays (subject ids, time,
+#' observed concentration, BLQ/ALOQ flags, LLOQ, …) into a one-row-per-
+#' observation tibble. Non-columnar members — notably the predicted-
+#' concentration quantile bands — are kept on the `"extra"` attribute; the PD
+#' block is on `"pd"` and the fit id on `"model_fit_id"`.
 #'
 #' @param fit A fit id or `vmx_model_fit`.
 #' @param client A `vmx_client`.
-#' @return A list (the parsed artifact).
+#' @return A tibble (one row per PK observation).
 #' @export
 vmx_fit_obs_vs_pred <- function(fit, client = vmx_client()) {
-  vmx_get(client, paste0("/model-fits/", vmx_id(fit, "mf"), "/obs-vs-pred"))
+  art <- vmx_get(client, paste0("/model-fits/", vmx_id(fit, "mf"), "/obs-vs-pred"))
+  out <- vmx_columns_to_tibble(art$pk)
+  attr(out, "pd") <- art$pd_markers
+  attr(out, "model_fit_id") <- art$model_fit_id
+  out
 }
 
 #' Visual predictive check artifact
