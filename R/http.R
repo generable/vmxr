@@ -110,6 +110,15 @@ vmx_put <- function(client, path, body = NULL) {
   vmx_perform(req)
 }
 
+#' PATCH a JSON body and return the parsed response
+#' @keywords internal
+#' @noRd
+vmx_patch <- function(client, path, body = NULL) {
+  req <- httr2::req_method(vmx_req(client, path), "PATCH")
+  if (!is.null(body)) req <- httr2::req_body_json(req, body)
+  vmx_perform(req)
+}
+
 #' Follow `next_cursor` pagination, returning all items as a flat list
 #'
 #' @param limit Optional cap on the total number of items returned.

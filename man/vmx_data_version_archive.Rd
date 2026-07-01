@@ -4,12 +4,17 @@
 \alias{vmx_data_version_archive}
 \title{Archive a data version}
 \usage{
-vmx_data_version_archive(dv, client = vmx_client())
+vmx_data_version_archive(dv, reason = NULL, client = vmx_client())
 }
 \arguments{
 \item{dv}{A data-version id or \code{vmx_data_version}.}
 
+\item{reason}{Optional free-text reason.}
+
 \item{client}{A \code{vmx_client}.}
+}
+\value{
+The updated \code{vmx_data_version}.
 }
 \description{
 Archive a data version

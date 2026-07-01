@@ -12,17 +12,20 @@ vmx_data_version_create(
 )
 }
 \arguments{
-\item{dataset}{A dataset id or \code{vmx_dataset}.}
+\item{dataset}{A dataset id (\code{ds_...}) or \code{vmx_dataset}.}
 
-\item{uploads}{Uploads to include.}
+\item{uploads}{Character vector of upload ids (\code{upl_...}) to format over.}
 
-\item{prior_config}{Optional prior config for warm-start.}
+\item{prior_config}{Optional prior data-version (\code{dv_...}) whose config seeds
+this job (the config-update lineage pointer).}
 
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A \code{vmx_data_version}.
+A \code{vmx_prep_status} for the new job.
 }
 \description{
-Create a data version
+Starts a format job over an explicit upload composition
+(\code{POST /datasets/{ds_id}/data-versions}). Returns the in-flight prep-status;
+poll it with \code{\link[=vmx_wait]{vmx_wait()}}.
 }

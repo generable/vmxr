@@ -22,7 +22,8 @@ vmx_study_create(
 
 \item{phase}{Optional clinical phase.}
 
-\item{...}{Additional fields.}
+\item{...}{Additional fields (\code{description}, \code{route_of_administration},
+\code{pd_markers}).}
 
 \item{client}{A \code{vmx_client}.}
 }

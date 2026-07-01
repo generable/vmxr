@@ -17,5 +17,5 @@ vmx_study_update(id, ..., client = vmx_client())
 A \code{vmx_study}.
 }
 \description{
-Update a study
+Only the fields you pass are changed (the server applies \code{exclude_unset}).
 }
