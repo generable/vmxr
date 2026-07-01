@@ -11,6 +11,9 @@ vmx_sim_cancel(job, client = vmx_client())
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+A \code{vmx_simulation_job}.
+}
 \description{
 Cancel a simulation job
 }

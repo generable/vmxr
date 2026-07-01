@@ -7,7 +7,7 @@
 vmx_sim_status(job, client = vmx_client())
 }
 \arguments{
-\item{job}{A job id or \code{vmx_simulation_job}.}
+\item{job}{A job id (\code{simjob_...}) or \code{vmx_simulation_job}.}
 
 \item{client}{A \code{vmx_client}.}
 }

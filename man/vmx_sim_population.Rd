@@ -2,16 +2,31 @@
 % Please edit documentation in R/simulation.R
 \name{vmx_sim_population}
 \alias{vmx_sim_population}
-\title{Simulate a population}
+\title{Simulate a population scenario}
 \usage{
-vmx_sim_population(fit, spec, wait = FALSE, client = vmx_client())
+vmx_sim_population(
+  fit,
+  dosing_input,
+  scenario_name,
+  idempotency_key = NULL,
+  retried_from = NULL,
+  wait = FALSE,
+  ...,
+  client = vmx_client()
+)
 }
 \arguments{
 \item{fit}{A fit id or \code{vmx_model_fit}.}
 
-\item{spec}{Simulation spec.}
+\item{dosing_input}{A dosing-input id or \code{vmx_dosing_input}.}
+
+\item{scenario_name}{The population scenario name.}
+
+\item{idempotency_key, retried_from}{Optional create fields.}
 
 \item{wait}{If \code{TRUE}, block until the job settles.}
+
+\item{...}{Polling controls forwarded to \code{\link[=vmx_wait]{vmx_wait()}}.}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -19,5 +34,5 @@ vmx_sim_population(fit, spec, wait = FALSE, client = vmx_client())
 A \code{vmx_simulation_job}.
 }
 \description{
-Simulate a population
+\code{POST /model-fits/{mf_id}/population-simulation-jobs}.
 }
