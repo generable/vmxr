@@ -53,3 +53,11 @@
   tibble), and `vmx_prep_answer()` (posts a named-list answers body).
   `vmx_dataset_download()` stays unimplemented — the files listing exposes no
   per-file download URL (use `vmx_data_version_export()`).
+* Modeling-data access: `vmx_data_version_table()` (any of the `subjects`/`pk`/
+  `dosing`/`pd`/`labs`/`covariates` domains → a typed tibble, column metadata on
+  the `"columns"` attribute), the `vmx_subjects()` / `vmx_pk()` / `vmx_pd()`
+  accessors, and `vmx_model_data()` (bundles the available tables + DV metadata
+  as a `vmx_model_data` object, fetching only `table_availability` domains). The
+  nlmixr2 (`vmx_nlmixr_data()`) and Stan/Torsten (`vmx_torsten_data()`) adapters
+  remain deferred stubs — the NONMEM/ragged-array assembly must be validated
+  against real data + the DV column manifest before shipping.
