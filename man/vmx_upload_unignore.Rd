@@ -2,15 +2,20 @@
 % Please edit documentation in R/datasets.R
 \name{vmx_upload_unignore}
 \alias{vmx_upload_unignore}
-\title{Unignore an upload}
+\title{Reverse a prior upload ignore}
 \usage{
-vmx_upload_unignore(upload, client = vmx_client())
+vmx_upload_unignore(dataset, upload, client = vmx_client())
 }
 \arguments{
-\item{upload}{An upload id or object.}
+\item{dataset}{A dataset id or \code{vmx_dataset}.}
+
+\item{upload}{The upload id (\code{upl_...}) to ignore.}
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+The updated \code{vmx_prep_status}.
+}
 \description{
-Unignore an upload
+\code{POST /datasets/{ds_id}/unignore-upload}.
 }

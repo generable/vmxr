@@ -9,7 +9,7 @@ vmx_prep_answer(dataset, answers, client = vmx_client())
 \arguments{
 \item{dataset}{A dataset id or \code{vmx_dataset}.}
 
-\item{answers}{A named list, data.frame, or path to an answers file.}
+\item{answers}{A named list mapping each prompt \code{field} to its answer value.}
 
 \item{client}{A \code{vmx_client}.}
 }
