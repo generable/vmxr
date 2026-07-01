@@ -2,15 +2,20 @@
 % Please edit documentation in R/datasets.R
 \name{vmx_upload_ignore}
 \alias{vmx_upload_ignore}
-\title{Ignore an upload}
+\title{Ignore an upload within a dataset}
 \usage{
-vmx_upload_ignore(upload, client = vmx_client())
+vmx_upload_ignore(dataset, upload, client = vmx_client())
 }
 \arguments{
-\item{upload}{An upload id or object.}
+\item{dataset}{A dataset id or \code{vmx_dataset}.}
+
+\item{upload}{The upload id (\code{upl_...}) to ignore.}
 
 \item{client}{A \code{vmx_client}.}
 }
+\value{
+The updated \code{vmx_prep_status}.
+}
 \description{
-Ignore an upload
+\code{POST /datasets/{ds_id}/ignore-upload}. Soft-ignores one delivery.
 }

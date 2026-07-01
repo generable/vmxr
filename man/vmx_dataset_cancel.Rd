@@ -2,7 +2,7 @@
 % Please edit documentation in R/datasets.R
 \name{vmx_dataset_cancel}
 \alias{vmx_dataset_cancel}
-\title{Cancel a dataset's in-flight processing}
+\title{Cancel a dataset's in-flight format job}
 \usage{
 vmx_dataset_cancel(dataset, client = vmx_client())
 }
@@ -12,8 +12,9 @@ vmx_dataset_cancel(dataset, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A \code{vmx_dataset}.
+The updated \code{vmx_prep_status}.
 }
 \description{
-Cancel a dataset's in-flight processing
+\code{POST /datasets/{ds_id}/cancel} — terminates the format job and mints a
+cancelled DataVersion.
 }
