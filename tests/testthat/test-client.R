@@ -4,6 +4,12 @@ test_that("vmx_client resolves explicit args", {
   expect_equal(con$base_url, "https://example.test") # trailing slash trimmed
 })
 
+test_that("vmx_client trims surrounding whitespace (e.g. from .Renviron)", {
+  con <- vmx_client(base_url = "  https://example.test  ", token = "\tpat_abc\n")
+  expect_equal(con$base_url, "https://example.test")
+  expect_equal(con$token, "pat_abc")
+})
+
 test_that("vmx_client errors without a base_url", {
   withr::local_envvar(VMX_API_BASE_URL = "", VMX_API_TOKEN = "")
   expect_error(vmx_client(), class = "vmx_usage_error")
