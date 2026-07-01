@@ -59,6 +59,13 @@ vmx_id <- function(x, prefix = NULL, arg = "id") {
   id
 }
 
+#' Resolve an optional id argument (`NULL` passes through)
+#' @keywords internal
+#' @noRd
+vmx_opt_id <- function(x, prefix = NULL, arg = "id") {
+  if (is.null(x)) NULL else vmx_id(x, prefix, arg)
+}
+
 #' @export
 print.vmx_resource <- function(x, ...) {
   cls <- class(x)[[1]]

@@ -4,10 +4,11 @@
 \alias{vmx_studies}
 \title{List studies for a treatment}
 \usage{
-vmx_studies(treatment, status = NULL, client = vmx_client())
+vmx_studies(treatment = NULL, status = NULL, client = vmx_client())
 }
 \arguments{
-\item{treatment}{A treatment id or \code{vmx_treatment}.}
+\item{treatment}{A treatment id (\code{tmt_...}) or \code{vmx_treatment}; \code{NULL} lists
+across all treatments.}
 
 \item{status}{Optional status filter.}
 

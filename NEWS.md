@@ -12,3 +12,11 @@
   `print`/`as_tibble`, id-or-object resolution with prefix validation, and
   collection→tibble conversion. httr2-mocked unit tests plus an opt-in live
   smoke test (`VMX_RUN_LIVE_TESTS=1`).
+* Studies + data-versions slice: `vmx_studies()` / `vmx_study()` /
+  `vmx_study_create()` / `vmx_study_update()`; `vmx_data_versions()` /
+  `vmx_data_version()` / `vmx_data_version_create()` (format job over an upload
+  composition, returns a prep-status) / `vmx_data_version_archive()` /
+  `vmx_data_version_unarchive()` / `vmx_data_version_export()` (signed-URL
+  envelope, optional streamed download). Adds a `vmx_patch()` HTTP helper and
+  `vmx_opt_id()` (NULL-passthrough id resolution). The `vmx_data_version_table()`
+  and modeling-data adapters (§6.5a) remain stubbed for a dedicated slice.
