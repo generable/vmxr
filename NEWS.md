@@ -47,3 +47,9 @@
   `vmx_sim_status()`, `vmx_sim_result()`, `vmx_sim_cancel()`. `vmx_wait()` gains
   a simulation-job method (terminal `succeeded`; `failed`/`cancelled` raise).
   `vmx_sim_result()` returns the parsed result payload (reshaping deferred).
+* Dataset + prep verbs: `vmx_dataset_files()`, `vmx_dataset_tags()` (key/value
+  tibble), `vmx_dataset_cancel()`, `vmx_upload_ignore()` / `vmx_upload_unignore()`
+  (now take `dataset` + `upload`), `vmx_prep_questions()` (prompt fields →
+  tibble), and `vmx_prep_answer()` (posts a named-list answers body).
+  `vmx_dataset_download()` stays unimplemented — the files listing exposes no
+  per-file download URL (use `vmx_data_version_export()`).

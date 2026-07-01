@@ -98,49 +98,93 @@ vmx_dataset <- function(id, client = vmx_client()) {
 #' @return A tibble.
 #' @export
 vmx_dataset_files <- function(dataset, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_dataset_files()")
+  id <- vmx_id(dataset, "ds", arg = "dataset")
+  vmx_items_to_tibble(vmx_paginate(client, paste0("/datasets/", id, "/files")))
 }
 
-#' List the tags on a dataset
+#' The tags on a dataset
+#'
+#' Returns the dataset's allowlisted tag map as a two-column (`key`, `value`)
+#' tibble. Reads the tags off a `vmx_dataset` object when given one, else
+#' fetches the dataset.
+#'
 #' @param dataset A dataset id or `vmx_dataset`.
 #' @param client A `vmx_client`.
-#' @return A tibble.
+#' @return A tibble with `key` and `value` columns.
 #' @export
 vmx_dataset_tags <- function(dataset, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_dataset_tags()")
+  tags <- if (inherits(dataset, "vmx_dataset") && !is.null(dataset[["tags"]])) {
+    dataset[["tags"]]
+  } else {
+    vmx_dataset(vmx_id(dataset, "ds", arg = "dataset"), client = client)[["tags"]]
+  }
+  if (is.null(tags) || !length(tags)) {
+    return(tibble::tibble(key = character(0), value = character(0)))
+  }
+  tibble::tibble(key = names(tags), value = vmx_chr(unname(tags)))
 }
 
-#' Cancel a dataset's in-flight processing
+#' Cancel a dataset's in-flight format job
+#'
+#' `POST /datasets/{ds_id}/cancel` — terminates the format job and mints a
+#' cancelled DataVersion.
+#'
 #' @param dataset A dataset id or `vmx_dataset`.
 #' @param client A `vmx_client`.
-#' @return A `vmx_dataset`.
+#' @return The updated `vmx_prep_status`.
 #' @export
 vmx_dataset_cancel <- function(dataset, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_dataset_cancel()")
+  data <- vmx_post(client, paste0("/datasets/", vmx_id(dataset, "ds", arg = "dataset"), "/cancel"))
+  new_vmx_resource(data, "vmx_prep_status", "dataset_id")
 }
 
 #' Download a dataset's files
+#'
+#' Not implemented: the API's dataset-files listing does not expose per-file
+#' download URLs. Use [vmx_data_version_export()] to pull a curated bundle.
+#'
 #' @param dataset A dataset id or `vmx_dataset`.
 #' @param dest Destination directory.
 #' @param client A `vmx_client`.
-#' @return Character vector of written file paths.
+#' @return Not yet implemented.
 #' @export
 vmx_dataset_download <- function(dataset, dest = ".", client = vmx_client()) {
   vmx_abort_unimplemented("vmx_dataset_download()")
 }
 
-#' Ignore an upload
-#' @param upload An upload id or object.
+#' Ignore an upload within a dataset
+#'
+#' `POST /datasets/{ds_id}/ignore-upload`. Soft-ignores one delivery.
+#'
+#' @param dataset A dataset id or `vmx_dataset`.
+#' @param upload The upload id (`upl_...`) to ignore.
 #' @param client A `vmx_client`.
+#' @return The updated `vmx_prep_status`.
 #' @export
-vmx_upload_ignore <- function(upload, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_upload_ignore()")
+vmx_upload_ignore <- function(dataset, upload, client = vmx_client()) {
+  vmx_set_upload_ignored(dataset, upload, TRUE, client)
 }
 
-#' Unignore an upload
-#' @param upload An upload id or object.
-#' @param client A `vmx_client`.
+#' Reverse a prior upload ignore
+#'
+#' `POST /datasets/{ds_id}/unignore-upload`.
+#'
+#' @inheritParams vmx_upload_ignore
+#' @return The updated `vmx_prep_status`.
 #' @export
-vmx_upload_unignore <- function(upload, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_upload_unignore()")
+vmx_upload_unignore <- function(dataset, upload, client = vmx_client()) {
+  vmx_set_upload_ignored(dataset, upload, FALSE, client)
+}
+
+#' @keywords internal
+#' @noRd
+vmx_set_upload_ignored <- function(dataset, upload, ignored, client) {
+  endpoint <- if (ignored) "ignore-upload" else "unignore-upload"
+  upload_id <- if (inherits(upload, "vmx_resource")) vmx_resource_id(upload) else upload
+  data <- vmx_post(
+    client,
+    paste0("/datasets/", vmx_id(dataset, "ds", arg = "dataset"), "/", endpoint),
+    list(upload_id = upload_id)
+  )
+  new_vmx_resource(data, "vmx_prep_status", "dataset_id")
 }

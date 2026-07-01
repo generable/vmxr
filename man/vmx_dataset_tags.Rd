@@ -2,7 +2,7 @@
 % Please edit documentation in R/datasets.R
 \name{vmx_dataset_tags}
 \alias{vmx_dataset_tags}
-\title{List the tags on a dataset}
+\title{The tags on a dataset}
 \usage{
 vmx_dataset_tags(dataset, client = vmx_client())
 }
@@ -12,8 +12,10 @@ vmx_dataset_tags(dataset, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+A tibble with \code{key} and \code{value} columns.
 }
 \description{
-List the tags on a dataset
+Returns the dataset's allowlisted tag map as a two-column (\code{key}, \code{value})
+tibble. Reads the tags off a \code{vmx_dataset} object when given one, else
+fetches the dataset.
 }
