@@ -3,7 +3,7 @@ Title: VeloMetrix R Client
 Version: 0.1.1
 Authors@R: c(
     person(given = "Eric", family = "Novik", email = "eric@generable.com", role = c("aut", "cre")),
-    person(given = "Juho", family = "Timonen", email = "juho@generable.com", role = "ctb"),
+    person(given = "Juho", family = "Timonen", role = "ctb"),
     person(given = "Generable", role = c("cph", "fnd")))
 Author: Eric Novik [aut, cre],
     Juho Timonen [ctb],

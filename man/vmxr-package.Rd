@@ -21,7 +21,7 @@ Useful links:
 
 Other contributors:
 \itemize{
-  \item Juho Timonen \email{juho@generable.com} [contributor]
+  \item Juho Timonen [contributor]
   \item Generable [copyright holder, funder]
 }
 
