@@ -9,8 +9,8 @@
 # Steps:
 #   1. Download the published spec to inst/openapi/openapi.json.
 #   2. Emit enum/type constants into R/generated/.
-#   3. Leave the hand-written calls in R/*.R untouched; the contract test
-#      (tests/testthat/test-contract.R) verifies they still match the spec.
+#   3. Leave the hand-written calls in R/*.R untouched. A future contract test
+#      should verify that they still match the spec.
 
 # Published artifact (see inst/openapi/README.md).
 OPENAPI_URL <- Sys.getenv(

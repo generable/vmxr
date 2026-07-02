@@ -19,13 +19,9 @@ Useful links:
 \author{
 \strong{Maintainer}: Eric Novik \email{eric@generable.com}
 
-Authors:
-\itemize{
-  \item Eric Novik \email{eric@generable.com}
-}
-
 Other contributors:
 \itemize{
+  \item Juho Timonen [contributor]
   \item Generable [copyright holder, funder]
 }
 

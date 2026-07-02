@@ -1,9 +1,14 @@
 Package: vmxr
 Title: VeloMetrix R Client
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: c(
-    person("Eric", "Novik", , "eric@generable.com", role = c("aut", "cre")),
-    person("Generable", role = c("cph", "fnd")))
+    person(given = "Eric", family = "Novik", email = "eric@generable.com", role = c("aut", "cre")),
+    person(given = "Juho", family = "Timonen", role = "ctb"),
+    person(given = "Generable", role = c("cph", "fnd")))
+Author: Eric Novik [aut, cre],
+    Juho Timonen [ctb],
+    Generable [cph, fnd]
+Maintainer: Eric Novik <eric@generable.com>
 Description: A native R client for the VeloMetrix REST API (vmx-api). Wraps the
     treatment-to-simulation analysis workflow in ergonomic, pipe-friendly verbs
     that block-and-poll for asynchronous server jobs and return native R objects
@@ -36,3 +41,4 @@ Config/testthat/edition: 3
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Config/roxygen2/version: 8.0.0
+RoxygenNote: 7.3.3

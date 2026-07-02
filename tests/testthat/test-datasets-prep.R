@@ -23,6 +23,39 @@ test_that("vmx_datasets lists with filters into a tibble", {
   expect_match(env$req$url, "study_id=std_1")
 })
 
+test_that("vmx_datasets accepts a vmx_study object", {
+  env <- new.env()
+  httr2::local_mocked_responses(function(req) {
+    env$req <- req
+    httr2::response_json(body = list(
+      items = list(list(dataset_id = "ds_1", status = "formatted")), next_cursor = NULL
+    ))
+  })
+  study <- new_vmx_resource(list(study_id = "std_7"), "vmx_study", "study_id")
+  vmx_datasets(study = study, client = con)
+  expect_match(env$req$url, "study_id=std_7")
+})
+
+test_that("vmx_upload sends config_yaml as inline form text", {
+  data_file <- tempfile(fileext = ".csv")
+  config_file <- tempfile(fileext = ".yaml")
+  writeLines("time,conc\n0,1", data_file)
+  writeLines(c("version: 2", "datasets: []"), config_file)
+
+  env <- capture_one(list(dataset_id = "ds_1", status = "uploaded"))
+  study <- new_vmx_resource(
+    list(study_id = "std_1", treatment_id = "tmt_1"),
+    "vmx_study",
+    "study_id"
+  )
+  vmx_upload(study, data_file, config = config_file, client = con)
+
+  body <- env$req$body$data
+  expect_equal(body$study_id, "std_1")
+  expect_equal(body$treatment_id, "tmt_1")
+  expect_equal(body$config_yaml, "version: 2\ndatasets: []")
+})
+
 test_that("vmx_dataset fetches and types the resource", {
   httr2::local_mocked_responses(list(httr2::response_json(body = list(
     dataset_id = "ds_1", status = "formatted", tags = list(name = "run-A")
