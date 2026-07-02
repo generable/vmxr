@@ -56,6 +56,14 @@ test_that("vmx_model_build wait=TRUE polls to terminal", {
   expect_equal(run$status, "succeeded")
 })
 
+test_that("vmx_model_build_report_create posts report request", {
+  env <- capture_one(list(run_id = "run_9", status = "queued", subject_plot_mode = "none"))
+  out <- vmx_model_build_report_create("run_9", subject_plot_mode = "none", client = con)
+  expect_equal(out$status, "queued")
+  expect_equal(env$req$body$data$subject_plot_mode, "none")
+  expect_match(env$req$url, "/model-build-runs/run_9/report$")
+})
+
 test_that("vmx_wait on a build run raises on failure/cancelled", {
   httr2::local_mocked_responses(list(httr2::response_json(body = run_item("run_9", "cancelled"))))
   run <- new_vmx_resource(run_item("run_9"), "vmx_model_build_run", "run_id")
@@ -78,6 +86,15 @@ test_that("vmx_model_fits and vmx_model_fit work", {
   fit <- vmx_model_fit("mf_1", client = con)
   expect_s3_class(fit, "vmx_model_fit")
   expect_equal(vmx_resource_id(fit), "mf_1")
+})
+
+test_that("vmx_model_fit_postprocessor_status calls the current endpoint", {
+  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+    model_fit_id = "mf_1", status = "succeeded"
+  ))))
+  out <- vmx_model_fit_postprocessor_status("mf_1", client = con)
+  expect_equal(out$model_fit_id, "mf_1")
+  expect_equal(out$status, "succeeded")
 })
 
 test_that("vmx_fit_subject_estimates reshapes to tidy long", {

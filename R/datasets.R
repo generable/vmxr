@@ -37,7 +37,13 @@ vmx_upload <- function(study, files,
 
   parts <- list(treatment_id = tmt_id, study_id = std_id, mode = mode)
   if (!is.null(config)) {
-    parts$config_yaml <- curl::form_file(config, type = "application/yaml")
+    if (!file.exists(config)) {
+      vmx_abort(
+        sprintf("Config file not found: %s", config),
+        class = "vmx_usage_error"
+      )
+    }
+    parts$config_yaml <- paste(readLines(config, warn = FALSE), collapse = "\n")
   }
   # Repeated `files` form field — a list with duplicate names, spliced in.
   file_parts <- stats::setNames(

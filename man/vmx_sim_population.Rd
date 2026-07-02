@@ -10,6 +10,7 @@ vmx_sim_population(
   scenario_name,
   idempotency_key = NULL,
   retried_from = NULL,
+  min_timepoints = NULL,
   wait = FALSE,
   ...,
   client = vmx_client()
@@ -23,6 +24,8 @@ vmx_sim_population(
 \item{scenario_name}{The population scenario name.}
 
 \item{idempotency_key, retried_from}{Optional create fields.}
+
+\item{min_timepoints}{Optional minimum number of simulated timepoints.}
 
 \item{wait}{If \code{TRUE}, block until the job settles.}
 

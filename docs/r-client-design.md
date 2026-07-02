@@ -346,7 +346,8 @@ vmx_pk(dv, analyte = NULL,
        format = c("tidy", "nonmem"),
        blq    = c("flag", "drop", "loq_half", "m3"),
        units  = c("as_reported", "si"),
-       time_basis = c("actual", "nominal"), client = vmx_client())       # -> tibble
+       time_basis = c("observed", "nominal", "nominal_from_observed_dose"),
+       client = vmx_client())                                            # -> tibble
 vmx_pd(dv, marker = NULL, format = c("tidy", "nonmem"), client = vmx_client())  # -> tibble
 ```
 
@@ -381,8 +382,8 @@ gets wrong. Build it once, correctly.
 - **Dosing fidelity from the server, not inferred:** `RATE` (zero-order/infusion
   duration), `II`/`ADDL`/`SS` (steady state), route/compartment mapping.
 - **Units + time basis first-class.** Explicit units (`as_reported` vs `si`) and
-  `time_basis` (`actual`/`nominal`) — a wrong assumption here silently corrupts
-  every fit.
+  `time_basis` (`observed`/`nominal`/`nominal_from_observed_dose`) — a wrong
+  assumption here silently corrupts every fit.
 - **Versioned + reproducible.** Everything keys off the immutable `dv_…` id; the
   content hash is returned in `$meta` so a modeling dataset is citable/repro for
   regulatory use.
@@ -495,7 +496,7 @@ if (vmx_prep_status(ds)$state == "awaiting_input") {
 }
 
 dv  <- vmx_data_version(vmx_prep_status(ds)$data_version_id)
-nca <- vmx_nca(dv, time_basis = "actual")          # creates + waits
+nca <- vmx_nca(dv, time_basis = "observed")        # creates + waits
 
 library(ggplot2)
 vmx_nca_result(nca) |>
@@ -515,7 +516,7 @@ vmx_treatment("tmt_01KT5QSYVYCR9HCBVCKXBVCT8X") |>
 **Fit a model and pull diagnostics as tibbles:**
 
 ```r
-run <- vmx_model_build(dv, time_basis = "actual",
+run <- vmx_model_build(dv, time_basis = "observed",
                        pd_marker = "GEN_abc123:decreasing", wait = TRUE)
 fit <- vmx_model_fits(run = run) |> dplyr::slice(1) |> vmx_model_fit()
 
@@ -568,7 +569,7 @@ Deliberately lean — no `tidyverse` hard dependency; works in a vanilla R insta
    [`vmx_api.openapi`](../services/api/src/vmx_api/openapi.py)).
 2. A `clients/r/data-raw/codegen.R` step vendors that spec into
    `inst/openapi/openapi.json` and (path b) generates enum/type constants only.
-3. A **contract test** (`tests/testthat/test-contract.R`) asserts every
+3. Add a **contract test** (`tests/testthat/test-contract.R`) asserting every
    `operationId` the ergonomic layer relies on still exists in the spec and that
    no wrapped parameter/enum value vanished. This is the cheap insurance that the
    hand-written layer can't silently drift from the API.
