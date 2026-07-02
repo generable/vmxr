@@ -24,6 +24,15 @@ test_that("vmx_dosing_input posts text + scenario_names", {
   expect_match(env$req$url, "/model-fits/mf_1/simulation-dosing-inputs$")
 })
 
+test_that("vmx_dosing_input_status fetches dosing input status", {
+  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+    dosing_input_id = "di_1", status = "succeeded"
+  ))))
+  out <- vmx_dosing_input_status("di_1", client = con)
+  expect_s3_class(out, "vmx_dosing_input")
+  expect_equal(out$status, "succeeded")
+})
+
 test_that("vmx_sim_existing_subject builds subject records from a data.frame", {
   env <- capture_one(job_item("simjob_9"))
   subj <- data.frame(gen_subject_uuid = c("u1", "u2"), subject_name = c("A", "B"))
@@ -35,6 +44,15 @@ test_that("vmx_sim_existing_subject builds subject records from a data.frame", {
   expect_match(env$req$url, "/existing-subject-simulation-jobs$")
 })
 
+test_that("vmx_sim_existing_subject_from_text posts dosing text", {
+  env <- capture_one(job_item("simjob_9"))
+  subj <- data.frame(gen_subject_uuid = "u1", subject_name = "A")
+  vmx_sim_existing_subject_from_text("mf_1", "100 mg qd", subj, min_timepoints = 300, client = con)
+  expect_equal(env$req$body$data$dosing_text, "100 mg qd")
+  expect_equal(env$req$body$data$min_timepoints, 300)
+  expect_match(env$req$url, "/existing-subject-simulation-jobs/from-text$")
+})
+
 test_that("vmx_sim_hypothetical_subject nests covariates", {
   env <- capture_one(job_item("simjob_9"))
   subj <- data.frame(subject_name = "H1", WT = 70, AGE = 40)
@@ -44,12 +62,38 @@ test_that("vmx_sim_hypothetical_subject nests covariates", {
   expect_equal(rec$covariates, list(WT = 70, AGE = 40))
 })
 
+test_that("vmx_sim_hypothetical_subject_from_text nests covariates", {
+  env <- capture_one(job_item("simjob_9"))
+  subj <- data.frame(subject_name = "H1", WT = 70)
+  vmx_sim_hypothetical_subject_from_text("mf_1", "100 mg qd", subj, client = con)
+  expect_equal(env$req$body$data$dosing_text, "100 mg qd")
+  expect_equal(env$req$body$data$subjects[[1]]$covariates, list(WT = 70))
+  expect_match(env$req$url, "/hypothetical-subject-simulation-jobs/from-text$")
+})
+
 test_that("vmx_sim_population posts scenario_name", {
   env <- capture_one(job_item("simjob_9"))
-  vmx_sim_population("mf_1", "di_1", "high-dose", client = con)
+  vmx_sim_population("mf_1", "di_1", "high-dose", min_timepoints = 300, client = con)
   expect_equal(env$req$body$data$dosing_input_id, "di_1")
   expect_equal(env$req$body$data$scenario_name, "high-dose")
+  expect_equal(env$req$body$data$min_timepoints, 300)
   expect_match(env$req$url, "/population-simulation-jobs$")
+})
+
+test_that("vmx_sim_population_from_text posts dosing text", {
+  env <- capture_one(job_item("simjob_9"))
+  vmx_sim_population_from_text("mf_1", "100 mg qd", "high-dose", client = con)
+  expect_equal(env$req$body$data$dosing_text, "100 mg qd")
+  expect_equal(env$req$body$data$scenario_name, "high-dose")
+  expect_match(env$req$url, "/population-simulation-jobs/from-text$")
+})
+
+test_that("vmx_sim_jobs lists jobs for a fit", {
+  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+    items = list(job_item("simjob_1", "succeeded")), next_cursor = NULL
+  ))))
+  out <- vmx_sim_jobs("mf_1", client = con)
+  expect_equal(out$simulation_job_id, "simjob_1")
 })
 
 test_that("vmx_sim_status / cancel type the result", {

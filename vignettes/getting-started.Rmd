@@ -7,8 +7,8 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE)
+```{r, include = FALSE, purl = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>", eval = FALSE, purl = FALSE)
 ```
 
 `vmxr` is a native R client for the VeloMetrix API. It collapses the
@@ -24,7 +24,7 @@ tibbles and typed S3 objects.
 `vmxr` uses the same mental model as the CLI: a base URL and an Authentik PAT,
 read from the environment (or `~/.Renviron`).
 
-```{r}
+```{r, purl = FALSE}
 # ~/.Renviron
 # VMX_API_BASE_URL=https://vmx-api.staging.gnrbl.co
 # VMX_API_TOKEN=pat_...
@@ -35,7 +35,7 @@ vmx_whoami()   # confirms the PAT works
 
 ## The whole workflow, in-session
 
-```{r}
+```{r, purl = FALSE}
 tmt   <- vmx_treatment_create("Compound XYZ", indication = "atrial fibrillation")
 study <- vmx_study_create(tmt, "Phase 1 SAD", phase = "1")
 
@@ -43,14 +43,14 @@ ds <- vmx_upload(study, files = c("conc.csv", "dosing.csv"),
                  mode = "initial", wait = TRUE)
 
 dv  <- vmx_data_version(vmx_prep_status(ds)$data_version_id)
-nca <- vmx_nca(dv, time_basis = "actual")   # creates + waits
+nca <- vmx_nca(dv, time_basis = "observed")   # creates + waits
 
 vmx_nca_result(nca)
 ```
 
 ## Model-ready data into R
 
-```{r}
+```{r, purl = FALSE}
 dv <- vmx_data_version("dv_...")
 
 # tidy domain tables
@@ -64,7 +64,7 @@ md$pk; md$subjects; md$meta
 
 ## Fit a model and pull diagnostics
 
-```{r}
+```{r, purl = FALSE}
 run <- vmx_model_build(dv, time_basis = "observed", wait = TRUE)
 fit <- vmx_model_fits(run = run) |> dplyr::slice(1) |> dplyr::pull(model_fit_id) |> vmx_model_fit()
 

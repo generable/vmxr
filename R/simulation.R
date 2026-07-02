@@ -18,6 +18,16 @@ vmx_dosing_input <- function(fit, dosing_text, scenario_name,
   new_vmx_resource(data, "vmx_dosing_input", "dosing_input_id")
 }
 
+#' Dosing-input status
+#' @param dosing_input A dosing-input id or `vmx_dosing_input`.
+#' @param client A `vmx_client`.
+#' @return A `vmx_dosing_input`.
+#' @export
+vmx_dosing_input_status <- function(dosing_input, client = vmx_client()) {
+  data <- vmx_get(client, paste0("/simulation-dosing-inputs/", vmx_dosing_input_id(dosing_input)))
+  new_vmx_resource(data, "vmx_dosing_input", "dosing_input_id")
+}
+
 #' Simulate existing (observed) subjects
 #'
 #' `POST /model-fits/{mf_id}/existing-subject-simulation-jobs`.
@@ -26,6 +36,7 @@ vmx_dosing_input <- function(fit, dosing_text, scenario_name,
 #' @param dosing_input A dosing-input id or `vmx_dosing_input`.
 #' @param subjects Subjects to simulate: a data.frame/tibble with
 #'   `gen_subject_uuid` + `subject_name` columns, or a list of such records.
+#' @param min_timepoints Optional minimum number of simulated timepoints.
 #' @param idempotency_key,retried_from Optional create fields.
 #' @param wait If `TRUE`, block until the job settles.
 #' @param ... Polling controls forwarded to [vmx_wait()].
@@ -34,14 +45,38 @@ vmx_dosing_input <- function(fit, dosing_text, scenario_name,
 #' @export
 vmx_sim_existing_subject <- function(fit, dosing_input, subjects,
                                      idempotency_key = NULL, retried_from = NULL,
+                                     min_timepoints = NULL,
                                      wait = FALSE, ..., client = vmx_client()) {
   body <- vmx_compact(list(
     dosing_input_id = vmx_dosing_input_id(dosing_input),
     subjects = vmx_rows_to_records(subjects, c("gen_subject_uuid", "subject_name")),
+    min_timepoints = min_timepoints,
     idempotency_key = idempotency_key,
     retried_from = retried_from
   ))
   vmx_create_sim_job(fit, "existing-subject-simulation-jobs", body, wait, client, ...)
+}
+
+#' Simulate existing subjects from dosing text
+#'
+#' `POST /model-fits/{mf_id}/existing-subject-simulation-jobs/from-text`.
+#'
+#' @inheritParams vmx_sim_existing_subject
+#' @param dosing_text The dosing regimen text.
+#' @return A `vmx_simulation_job`.
+#' @export
+vmx_sim_existing_subject_from_text <- function(fit, dosing_text, subjects,
+                                               idempotency_key = NULL, retried_from = NULL,
+                                               min_timepoints = NULL,
+                                               wait = FALSE, ..., client = vmx_client()) {
+  body <- vmx_compact(list(
+    dosing_text = dosing_text,
+    subjects = vmx_rows_to_records(subjects, c("gen_subject_uuid", "subject_name")),
+    min_timepoints = min_timepoints,
+    idempotency_key = idempotency_key,
+    retried_from = retried_from
+  ))
+  vmx_create_sim_job(fit, "existing-subject-simulation-jobs/from-text", body, wait, client, ...)
 }
 
 #' Simulate hypothetical subjects
@@ -52,6 +87,7 @@ vmx_sim_existing_subject <- function(fit, dosing_input, subjects,
 #' @param dosing_input A dosing-input id or `vmx_dosing_input`.
 #' @param subjects A data.frame/tibble with a `subject_name` column plus one
 #'   column per covariate, or a list of `{subject_name, covariates}` records.
+#' @param min_timepoints Optional minimum number of simulated timepoints.
 #' @param idempotency_key,retried_from Optional create fields.
 #' @param wait If `TRUE`, block until the job settles.
 #' @param ... Polling controls forwarded to [vmx_wait()].
@@ -60,14 +96,38 @@ vmx_sim_existing_subject <- function(fit, dosing_input, subjects,
 #' @export
 vmx_sim_hypothetical_subject <- function(fit, dosing_input, subjects,
                                          idempotency_key = NULL, retried_from = NULL,
+                                         min_timepoints = NULL,
                                          wait = FALSE, ..., client = vmx_client()) {
   body <- vmx_compact(list(
     dosing_input_id = vmx_dosing_input_id(dosing_input),
     subjects = vmx_hypothetical_records(subjects),
+    min_timepoints = min_timepoints,
     idempotency_key = idempotency_key,
     retried_from = retried_from
   ))
   vmx_create_sim_job(fit, "hypothetical-subject-simulation-jobs", body, wait, client, ...)
+}
+
+#' Simulate hypothetical subjects from dosing text
+#'
+#' `POST /model-fits/{mf_id}/hypothetical-subject-simulation-jobs/from-text`.
+#'
+#' @inheritParams vmx_sim_hypothetical_subject
+#' @param dosing_text The dosing regimen text.
+#' @return A `vmx_simulation_job`.
+#' @export
+vmx_sim_hypothetical_subject_from_text <- function(fit, dosing_text, subjects,
+                                                   idempotency_key = NULL, retried_from = NULL,
+                                                   min_timepoints = NULL,
+                                                   wait = FALSE, ..., client = vmx_client()) {
+  body <- vmx_compact(list(
+    dosing_text = dosing_text,
+    subjects = vmx_hypothetical_records(subjects),
+    min_timepoints = min_timepoints,
+    idempotency_key = idempotency_key,
+    retried_from = retried_from
+  ))
+  vmx_create_sim_job(fit, "hypothetical-subject-simulation-jobs/from-text", body, wait, client, ...)
 }
 
 #' Simulate a population scenario
@@ -77,6 +137,7 @@ vmx_sim_hypothetical_subject <- function(fit, dosing_input, subjects,
 #' @param fit A fit id or `vmx_model_fit`.
 #' @param dosing_input A dosing-input id or `vmx_dosing_input`.
 #' @param scenario_name The population scenario name.
+#' @param min_timepoints Optional minimum number of simulated timepoints.
 #' @param idempotency_key,retried_from Optional create fields.
 #' @param wait If `TRUE`, block until the job settles.
 #' @param ... Polling controls forwarded to [vmx_wait()].
@@ -85,14 +146,47 @@ vmx_sim_hypothetical_subject <- function(fit, dosing_input, subjects,
 #' @export
 vmx_sim_population <- function(fit, dosing_input, scenario_name,
                                idempotency_key = NULL, retried_from = NULL,
+                               min_timepoints = NULL,
                                wait = FALSE, ..., client = vmx_client()) {
   body <- vmx_compact(list(
     dosing_input_id = vmx_dosing_input_id(dosing_input),
     scenario_name = scenario_name,
+    min_timepoints = min_timepoints,
     idempotency_key = idempotency_key,
     retried_from = retried_from
   ))
   vmx_create_sim_job(fit, "population-simulation-jobs", body, wait, client, ...)
+}
+
+#' Simulate a population scenario from dosing text
+#'
+#' `POST /model-fits/{mf_id}/population-simulation-jobs/from-text`.
+#'
+#' @inheritParams vmx_sim_population
+#' @param dosing_text The dosing regimen text.
+#' @return A `vmx_simulation_job`.
+#' @export
+vmx_sim_population_from_text <- function(fit, dosing_text, scenario_name,
+                                         idempotency_key = NULL, retried_from = NULL,
+                                         min_timepoints = NULL,
+                                         wait = FALSE, ..., client = vmx_client()) {
+  body <- vmx_compact(list(
+    dosing_text = dosing_text,
+    scenario_name = scenario_name,
+    min_timepoints = min_timepoints,
+    idempotency_key = idempotency_key,
+    retried_from = retried_from
+  ))
+  vmx_create_sim_job(fit, "population-simulation-jobs/from-text", body, wait, client, ...)
+}
+
+#' List simulation jobs for a model fit
+#' @param fit A fit id or `vmx_model_fit`.
+#' @param client A `vmx_client`.
+#' @return A tibble.
+#' @export
+vmx_sim_jobs <- function(fit, client = vmx_client()) {
+  vmx_items_to_tibble(vmx_paginate(client, paste0("/model-fits/", vmx_id(fit, "mf", "fit"), "/simulation-jobs")))
 }
 
 #' Simulation job status

@@ -12,7 +12,7 @@ modeling &rarr; simulation workflow in ergonomic, pipe-friendly verbs that
 Our users are pharmacometricians who work in R/RStudio; `vmxr` keeps the whole
 analysis next to their data instead of shuttling files and IDs through a shell.
 
-> **Status: functional (v0.1.0), pre-CRAN.** The client covers the full analysis
+> **Status: functional (v0.1.1), pre-CRAN.** The client covers the full analysis
 > workflow end to end — treatments, studies, datasets & prep, data-versions,
 > modeling-data tables, NCA, modeling (build runs, fits, estimates), simulation,
 > and the study analysis log — validated against the live API on staging.
@@ -61,18 +61,16 @@ tmt   <- vmx_treatment_create("Compound XYZ", indication = "atrial fibrillation"
 study <- vmx_study_create(tmt, "Phase 1 SAD", phase = "1")
 ds    <- vmx_upload(study, c("conc.csv", "dosing.csv"), mode = "initial", wait = TRUE)
 dv    <- vmx_data_version(vmx_prep_status(ds)$data_version_id)
-nca   <- vmx_nca(dv, time_basis = "actual")
+nca   <- vmx_nca(dv, time_basis = "observed")
 vmx_nca_result(nca)
 ```
 
 ## Design
 
-The package has two layers (see the design doc):
-
-1. **Low-level bindings** (`R/generated/`) — one function per OpenAPI operation,
-   generated from a vendored `openapi.json` snapshot. Users rarely call these.
-2. **Ergonomic layer** (`R/*.R`) — the curated, hand-written public API that adds
-   polling, pagination, multipart upload, and tibble/S3 conversion.
+The package exposes a curated, hand-written public API in `R/*.R` that adds
+polling, pagination, multipart upload, and tibble/S3 conversion. The OpenAPI
+snapshot/codegen path is still a development task, not a shipped generated
+binding layer.
 
 The client holds **no business logic**: the API is the single source of truth.
 

@@ -1,3 +1,13 @@
+# vmxr 0.1.1
+
+* Send upload `config_yaml` as inline YAML text, matching the current API form
+  contract.
+* Add wrappers for report creation, model-fit postprocessor status,
+  dosing-input status, fit simulation-job listing, and simulation `from-text`
+  creation endpoints.
+* Fix examples to use valid time bases and clarify that OpenAPI codegen is not
+  shipped yet.
+
 # vmxr 0.1.0
 
 First broadly functional release: the client now covers the full analysis
