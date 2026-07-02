@@ -9,7 +9,7 @@ Description: A native R client for the VeloMetrix REST API (vmx-api). Wraps the
     that block-and-poll for asynchronous server jobs and return native R objects
     (tibbles and typed S3 objects). The package orchestrates server-side jobs;
     it holds no business logic of its own. Targets API 0.2.x / CLI 0.6.x.
-License: file LICENSE
+License: Apache License (>= 2)
 URL: https://github.com/generable/vmxr
 BugReports: https://github.com/generable/vmxr/issues
 Depends:
