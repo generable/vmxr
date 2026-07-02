@@ -1,0 +1,16 @@
+# Test that vmxr builds + checks under the exact R-universe pipeline (docs.r-universe.dev
+# §13.9). Uses r-universe's reusable workflow on GitHub-hosted runners — no secrets, no
+# self-hosted runner — so it is safe on this public repo. Mirrors the CRAN-like build that
+# generable.r-universe.dev runs, catching publish-time build failures in PR/CI instead.
+name: Test R-universe
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    name: R-universe testing
+    uses: r-universe-org/workflows/.github/workflows/build.yml@v3
+    with:
+      universe: ${{ github.repository_owner }}
