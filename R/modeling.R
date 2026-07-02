@@ -171,6 +171,25 @@ vmx_model_build_report <- function(run, client = vmx_client()) {
   vmx_get(client, paste0("/model-build-runs/", vmx_id(run, "run"), "/report"))
 }
 
+#' Request build-run report generation
+#'
+#' `POST /model-build-runs/{run_id}/report` queues HTML report generation.
+#'
+#' @param run A build-run id or object.
+#' @param subject_plot_mode One of `"all"` or `"none"`.
+#' @param client A `vmx_client`.
+#' @return A list with report status.
+#' @export
+vmx_model_build_report_create <- function(run, subject_plot_mode = c("all", "none"),
+                                          client = vmx_client()) {
+  subject_plot_mode <- match.arg(subject_plot_mode)
+  vmx_post(
+    client,
+    paste0("/model-build-runs/", vmx_id(run, "run"), "/report"),
+    list(subject_plot_mode = subject_plot_mode)
+  )
+}
+
 #' Cancel a build run
 #' @param run A build-run id or object.
 #' @param client A `vmx_client`.
@@ -230,6 +249,15 @@ vmx_model_fit <- function(id, client = vmx_client()) {
   data <- vmx_get(client, paste0("/model-fits/", mf, "/details"))
   data$model_fit_id <- mf
   new_vmx_resource(data, "vmx_model_fit", "model_fit_id")
+}
+
+#' Model-fit postprocessor status
+#' @param fit A fit id or `vmx_model_fit`.
+#' @param client A `vmx_client`.
+#' @return A list with postprocessor status.
+#' @export
+vmx_model_fit_postprocessor_status <- function(fit, client = vmx_client()) {
+  vmx_get(client, paste0("/model-fits/", vmx_id(fit, "mf"), "/postprocessor-status"))
 }
 
 #' Subject-level parameter estimates (tidy, long)

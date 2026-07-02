@@ -10,6 +10,7 @@ vmx_sim_existing_subject(
   subjects,
   idempotency_key = NULL,
   retried_from = NULL,
+  min_timepoints = NULL,
   wait = FALSE,
   ...,
   client = vmx_client()
@@ -24,6 +25,8 @@ vmx_sim_existing_subject(
 \code{gen_subject_uuid} + \code{subject_name} columns, or a list of such records.}
 
 \item{idempotency_key, retried_from}{Optional create fields.}
+
+\item{min_timepoints}{Optional minimum number of simulated timepoints.}
 
 \item{wait}{If \code{TRUE}, block until the job settles.}
 

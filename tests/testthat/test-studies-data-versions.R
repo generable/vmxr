@@ -77,6 +77,14 @@ test_that("vmx_data_versions forwards filters as query params", {
   expect_match(url, "include_archived=false")
 })
 
+test_that("vmx_data_versions accepts a vmx_study object", {
+  cm <- capturing_mock(list(items = list(dv_item("dv_1", study = "std_7")), next_cursor = NULL))
+  httr2::local_mocked_responses(cm$mock)
+  study <- new_vmx_resource(list(study_id = "std_7"), "vmx_study", "study_id")
+  vmx_data_versions(study = study, client = con)
+  expect_match(cm$captured$req$url, "study_id=std_7")
+})
+
 test_that("vmx_data_version fetches and types the resource", {
   cm <- capturing_mock(dv_item("dv_42"))
   httr2::local_mocked_responses(cm$mock)
