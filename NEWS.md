@@ -1,3 +1,16 @@
+# vmxr 0.1.1.9000 (development)
+
+* Native OIDC device-code authentication (GEN-2332). `vmx_login()` runs the
+  RFC 8628 device-code flow via `httr2::oauth_flow_device()` against the
+  Authentik provider (public client, `offline_access` scope for a refresh
+  token) and caches the token. `vmx_client()` now **auto-authenticates** from
+  that cache when no `VMX_API_TOKEN` / `token=` is set, refreshing silently and
+  prompting `vmx_login()` only when there's no usable cached token. The token
+  is cached as plain JSON at `~/.config/vmx/oidc-token.json` — the same path and
+  shape the `vmx` CLI uses (`0600`) — so one login serves both R and the CLI and
+  survives a fresh R session / pod restart. Configured via `VMX_OIDC_ISSUER`,
+  `VMX_OIDC_CLIENT_ID`, `VMX_OIDC_SCOPES`.
+
 # vmxr 0.1.1
 
 * Send upload `config_yaml` as inline YAML text, matching the current API form
