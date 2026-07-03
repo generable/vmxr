@@ -138,6 +138,12 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
 
 # -- on-disk cache (CLI-compatible JSON, 0600) --------------------------------
 
+# Resolve the on-disk cache path. The vmx CLI has *no* cache-path override -- it
+# always uses the fixed `~/.config/vmx/oidc-token.json`. VMX_OIDC_TOKEN_CACHE is
+# therefore a **testing-only** override, not a user-facing knob: pointing it
+# elsewhere diverges vmxr's cache from the CLI's fixed path and breaks the
+# "one login serves both R and the CLI" invariant. Tests set it to an isolated
+# tempfile; real users should leave it unset.
 .vmx_oidc_cache_path <- function() {
   path <- trimws(Sys.getenv("VMX_OIDC_TOKEN_CACHE", unset = ""))
   if (!nzchar(path)) path <- .vmx_oidc_default_cache
@@ -334,8 +340,12 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
 #' @param client_id Public OIDC client id. Defaults to `VMX_OIDC_CLIENT_ID`.
 #' @param scopes Space-separated scopes. Defaults to `VMX_OIDC_SCOPES`, then to
 #'   `"openid profile email offline_access goauthentik.io/api"`.
-#' @param cache_path Where to cache the token. Defaults to
-#'   `VMX_OIDC_TOKEN_CACHE`, then `~/.config/vmx/oidc-token.json`.
+#' @param cache_path Where to cache the token. Defaults to the CLI-shared
+#'   `~/.config/vmx/oidc-token.json`. The `VMX_OIDC_TOKEN_CACHE` env var can
+#'   override this, but it is a **testing-only** override (the `vmx` CLI has no
+#'   such variable): pointing it elsewhere makes vmxr read/write a cache the CLI
+#'   never sees, breaking the "one login serves both" invariant. Leave it unset
+#'   in normal use.
 #'
 #' @return Invisibly, the cached token (a list; the access/refresh tokens are
 #'   secret and never printed).
@@ -346,7 +356,20 @@ vmx_login <- function(issuer = NULL, client_id = NULL, scopes = NULL,
   cache_path <- cache_path %||% .vmx_oidc_cache_path()
   endpoints <- .vmx_oidc_discover(config)
   oauth_client <- .vmx_oidc_client(config, endpoints$token)
-  raw <- .vmx_oidc_device_flow(oauth_client, endpoints$device, config$scopes)
+  raw <- tryCatch(
+    .vmx_oidc_device_flow(oauth_client, endpoints$device, config$scopes),
+    error = function(e) {
+      # Keep our own already-classed errors; wrap raw httr2 / oauth_flow_device
+      # failures (user denied, code expired, slow_down polling exhausted,
+      # timeout) into vmx_auth_error so they stay in the vmx_error hierarchy and
+      # callers can catch every auth failure the same way.
+      if (inherits(e, "vmx_error")) stop(e)
+      vmx_abort(
+        paste0("OIDC device-code login failed: ", conditionMessage(e)),
+        class = "vmx_auth_error", parent = e
+      )
+    }
+  )
   token <- .vmx_token_from_httr2(config, raw)
   .vmx_save_cached_token(token, cache_path)
   cli::cli_alert_success("Logged in to VeloMetrix; token cached at {.path {cache_path}}.")
@@ -358,6 +381,11 @@ vmx_login <- function(issuer = NULL, client_id = NULL, scopes = NULL,
 #' Returns a usable access token, refreshing silently when the cached one is
 #' expired, and running [vmx_login()] when there is no usable cached token (only
 #' possible in an interactive session; otherwise a `vmx_auth_error` is raised).
+#'
+#' A cached token whose `issuer`/`client_id` do not match the current config is
+#' never silently reused; interactively it is overwritten only after a warning
+#' (the cache is shared with the CLI), and non-interactively it raises a
+#' `vmx_auth_error` that names the mismatch.
 #' @keywords internal
 #' @noRd
 vmx_oidc_access_token <- function(config = vmx_oidc_config(),
@@ -365,7 +393,12 @@ vmx_oidc_access_token <- function(config = vmx_oidc_config(),
                                   can_prompt = interactive()) {
   token <- .vmx_load_cached_token(cache_path)
   refresh_err <- NULL
-  if (!is.null(token) && .vmx_token_matches(token, config)) {
+  # A cached token is only usable if it was minted for the *current* issuer +
+  # client_id. One for a different config must not be silently reused here, nor
+  # silently clobbered by the login below.
+  cache_mismatch <- !is.null(token) && !.vmx_token_matches(token, config)
+
+  if (!is.null(token) && !cache_mismatch) {
     if (!.vmx_token_expired(token)) return(token$access_token)
     if (!is.null(token$refresh_token)) {
       refreshed <- tryCatch(
@@ -381,16 +414,49 @@ vmx_oidc_access_token <- function(config = vmx_oidc_config(),
       }
     }
   }
+
   if (!isTRUE(can_prompt)) {
+    # State *why* there is no usable token accurately -- "no cache" is wrong when
+    # a token exists but is expired-without-refresh, or is for another config.
+    reason <- if (is.null(token)) {
+      "No cached OIDC token was found"
+    } else if (cache_mismatch) {
+      paste0(
+        "The cached OIDC token is for a different issuer/client_id (",
+        token$issuer, " / ", token$client_id, ") than the current config (",
+        config$issuer, " / ", config$client_id, ")"
+      )
+    } else if (is.null(token$refresh_token)) {
+      "The cached OIDC token is expired and has no refresh token to renew it"
+    } else {
+      "The cached OIDC token is expired and could not be refreshed"
+    }
     msg <- paste0(
-      "No usable cached OIDC token and not in an interactive session. Run ",
-      "`vmx_login()` interactively (or set `token=` / VMX_API_TOKEN)."
+      reason, ", and this is not an interactive session. Run `vmx_login()` ",
+      "interactively (or set `token=` / VMX_API_TOKEN)."
     )
     # Surface *why* a silent refresh failed (revoked/expired refresh token,
     # network) instead of collapsing every cause into the generic message.
     if (!is.null(refresh_err)) msg <- paste0(msg, " (token refresh failed: ", refresh_err, ")")
     vmx_abort(msg, class = "vmx_auth_error")
   }
+
+  # Interactive: vmx_login() below runs the device flow and overwrites the cache
+  # at `cache_path`. If a token for a *different* provider is cached there, warn
+  # before clobbering it -- that file is also the CLI's login (one login serves
+  # both), so a silent overwrite would log the CLI out of its provider.
+  if (cache_mismatch) {
+    cli::cli_warn(c(
+      "Overwriting a cached OIDC token issued for a different provider.",
+      "i" = "Cached: issuer {.val {token$issuer}}, client_id {.val {token$client_id}}.",
+      "i" = "Config: issuer {.val {config$issuer}}, client_id {.val {config$client_id}}.",
+      "!" = paste0(
+        "{.path {cache_path}} is shared with the vmx CLI; continue only if you ",
+        "mean to switch this machine's login to the new provider."
+      )
+    ))
+  }
+
   token <- vmx_login(
     issuer = config$issuer, client_id = config$client_id,
     scopes = config$scopes, cache_path = cache_path
@@ -398,10 +464,15 @@ vmx_oidc_access_token <- function(config = vmx_oidc_config(),
   token$access_token
 }
 
-# Resolve a bearer token for vmx_client() when no PAT is configured. Attempts
-# OIDC auto-auth when the OIDC env vars are set; otherwise raises a single
-# vmx_auth_error naming both auth methods.
-.vmx_client_bearer <- function() {
+# Build a per-request bearer-token provider for vmx_client() when no PAT is
+# configured. Requires OIDC to be configured (else a single vmx_auth_error names
+# both auth methods). The returned closure re-resolves the OIDC access token on
+# *every* call -- reading the cache and refreshing from the refresh token when
+# the access token is within the expiry skew -- so a long-lived client
+# self-heals instead of failing once its first access token expires (GEN-2344).
+# Config and cache path are captured once so the provider is stable across the
+# client's life even if the env vars later change.
+.vmx_client_bearer_provider <- function() {
   if (!.vmx_oidc_configured()) {
     vmx_abort(
       paste0(
@@ -411,5 +482,7 @@ vmx_oidc_access_token <- function(config = vmx_oidc_config(),
       class = "vmx_auth_error"
     )
   }
-  vmx_oidc_access_token()
+  config <- vmx_oidc_config()
+  cache_path <- .vmx_oidc_cache_path()
+  function() vmx_oidc_access_token(config = config, cache_path = cache_path)
 }

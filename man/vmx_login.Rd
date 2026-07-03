@@ -14,8 +14,12 @@ vmx_login(issuer = NULL, client_id = NULL, scopes = NULL, cache_path = NULL)
 \item{scopes}{Space-separated scopes. Defaults to \code{VMX_OIDC_SCOPES}, then to
 \code{"openid profile email offline_access goauthentik.io/api"}.}
 
-\item{cache_path}{Where to cache the token. Defaults to
-\code{VMX_OIDC_TOKEN_CACHE}, then \verb{~/.config/vmx/oidc-token.json}.}
+\item{cache_path}{Where to cache the token. Defaults to the CLI-shared
+\verb{~/.config/vmx/oidc-token.json}. The \code{VMX_OIDC_TOKEN_CACHE} env var can
+override this, but it is a \strong{testing-only} override (the \code{vmx} CLI has no
+such variable): pointing it elsewhere makes vmxr read/write a cache the CLI
+never sees, breaking the "one login serves both" invariant. Leave it unset
+in normal use.}
 }
 \value{
 Invisibly, the cached token (a list; the access/refresh tokens are

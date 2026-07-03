@@ -1,5 +1,17 @@
 # vmxr 0.1.1.9000 (development)
 
+* OIDC access tokens now self-heal on a reused client (GEN-2344). `vmx_client()`
+  no longer freezes the OIDC access token at construction: the bearer token is
+  resolved **per request** via a provider closure, so a long-lived
+  `con <- vmx_client()` silently refreshes from the cached refresh token when the
+  short-lived access token nears expiry and keeps working across a full session
+  instead of throwing `vmx_auth_error` a few minutes in. Also: device-flow
+  failures (user-denied / code-expired / polling-exhausted) are wrapped as
+  `vmx_auth_error`; a cached token whose issuer/client_id do not match the
+  current config is no longer silently reused or clobbered (interactive login
+  warns first, non-interactive raises a message naming the mismatch); the
+  "no usable cached token" message now describes the actual cause; and
+  `VMX_OIDC_TOKEN_CACHE` is documented as a testing-only override.
 * Native OIDC device-code authentication (GEN-2332). `vmx_login()` runs the
   RFC 8628 device-code flow via `httr2::oauth_flow_device()` against the
   Authentik provider (public client, `offline_access` scope for a refresh
