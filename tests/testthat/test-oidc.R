@@ -142,14 +142,15 @@ test_that("vmx_client auto-authenticates from a valid cached OIDC token", {
 
   con <- vmx_client()
   expect_s3_class(con, "vmx_client")
-  expect_equal(con$token, "cached_acc")
+  # The token is resolved per request via the provider, not frozen on the object.
+  expect_equal(con$token_provider(), "cached_acc")
 })
 
 test_that("explicit token / PAT bypasses OIDC entirely", {
   cache <- withr::local_tempfile(fileext = ".json") # never written
   local_oidc_env(cache)
   con <- vmx_client(token = "pat_abc")
-  expect_equal(con$token, "pat_abc")
+  expect_equal(con$token_provider(), "pat_abc")
   expect_false(file.exists(cache))
 })
 
@@ -165,4 +166,155 @@ test_that("configured OIDC but no cache and non-interactive raises vmx_auth_erro
   cache <- withr::local_tempfile(fileext = ".json") # absent
   local_oidc_env(cache)
   expect_error(vmx_oidc_access_token(can_prompt = FALSE), class = "vmx_auth_error")
+})
+
+# --- GEN-2344: persistent-client self-heal + refresh review nits --------------
+
+test_that("a long-lived vmx_client() refreshes a stale access token on a later call", {
+  # The structural gap the rest of the suite can't catch: it only exercises the
+  # fresh-client-per-call path. Here one client is reused across a token expiry.
+  cache <- withr::local_tempfile(fileext = ".json")
+  local_oidc_env(cache)
+  # A valid (non-expired) token at construction time.
+  .vmx_save_cached_token(
+    .vmx_token(
+      access_token = "acc_valid", refresh_token = "ref",
+      expires_at = as.numeric(Sys.time()) + 600,
+      token_type = "Bearer", issuer = issuer, client_id = "test-cli"
+    ),
+    cache
+  )
+  testthat::local_mocked_bindings(
+    .vmx_oidc_discover = function(config) list(device = "https://auth.test/device", token = "https://auth.test/token")
+  )
+
+  # Construct once (resolves the valid token; no network needed).
+  con <- vmx_client()
+
+  # Time passes and the access token expires. The provider re-reads the cache
+  # each request, so rewriting it as expired simulates the wall-clock elapse.
+  .vmx_save_cached_token(
+    .vmx_token(
+      access_token = "acc_valid", refresh_token = "ref",
+      expires_at = as.numeric(Sys.time()) - 10,
+      token_type = "Bearer", issuer = issuer, client_id = "test-cli"
+    ),
+    cache
+  )
+
+  # The next call on the *same* client refreshes (1st mock) then succeeds (2nd).
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(access_token = "acc_fresh", refresh_token = "ref2", expires_in = 600)),
+    httr2::response_json(body = list(
+      user_id = "usr_1", email = "a@b.co", name = "Ada", workspace_id = "ws_1",
+      roles = list("admin"), counts = list(treatments = 0L, data_versions = 0L, model_fits = 0L)
+    ))
+  ))
+
+  me <- vmx_whoami(con)
+  expect_equal(me$email, "a@b.co")
+  # The stale token was silently refreshed and re-cached -- no re-login.
+  expect_equal(.vmx_load_cached_token(cache)$access_token, "acc_fresh")
+})
+
+test_that("a valid non-expired cached token is returned without refreshing (skew boundary)", {
+  cache <- withr::local_tempfile(fileext = ".json")
+  local_oidc_env(cache)
+  # Life well beyond the 60s skew -> must be used as-is, not refreshed.
+  .vmx_save_cached_token(
+    .vmx_token(
+      access_token = "acc_ok", refresh_token = "ref",
+      expires_at = as.numeric(Sys.time()) + 600,
+      token_type = "Bearer", issuer = issuer, client_id = "test-cli"
+    ),
+    cache
+  )
+  refreshed <- FALSE
+  testthat::local_mocked_bindings(
+    .vmx_oidc_refresh_flow = function(config, token) {
+      refreshed <<- TRUE
+      stop("refresh must not run for a still-valid token")
+    }
+  )
+  expect_equal(vmx_oidc_access_token(can_prompt = FALSE), "acc_ok")
+  expect_false(refreshed)
+})
+
+test_that("a cached token inside the expiry skew window is refreshed", {
+  cache <- withr::local_tempfile(fileext = ".json")
+  local_oidc_env(cache)
+  # 30s of life left, inside the 60s skew -> treated as expired, refreshed early.
+  .vmx_save_cached_token(
+    .vmx_token(
+      access_token = "acc_soon", refresh_token = "ref",
+      expires_at = as.numeric(Sys.time()) + 30,
+      token_type = "Bearer", issuer = issuer, client_id = "test-cli"
+    ),
+    cache
+  )
+  testthat::local_mocked_bindings(
+    .vmx_oidc_discover = function(config) list(device = "https://auth.test/device", token = "https://auth.test/token")
+  )
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(access_token = "acc_new", refresh_token = "ref2", expires_in = 600))
+  ))
+  expect_equal(vmx_oidc_access_token(can_prompt = FALSE), "acc_new")
+})
+
+test_that("a config-mismatch cache is reported (not silently reused) when non-interactive", {
+  cache <- withr::local_tempfile(fileext = ".json")
+  local_oidc_env(cache) # config client_id = "test-cli"
+  .vmx_save_cached_token(
+    .vmx_token(
+      access_token = "acc_other", refresh_token = "ref",
+      expires_at = as.numeric(Sys.time()) + 600,
+      token_type = "Bearer", issuer = issuer, client_id = "other-cli"
+    ),
+    cache
+  )
+  err <- tryCatch(vmx_oidc_access_token(can_prompt = FALSE), vmx_auth_error = function(e) e)
+  expect_s3_class(err, "vmx_auth_error")
+  expect_match(conditionMessage(err), "different issuer/client_id")
+  # The mismatched token was never handed back.
+  expect_false(grepl("acc_other", conditionMessage(err)))
+})
+
+test_that("a config-mismatch cache warns before overwriting on interactive login", {
+  cache <- withr::local_tempfile(fileext = ".json")
+  local_oidc_env(cache)
+  .vmx_save_cached_token(
+    .vmx_token(
+      access_token = "acc_other", refresh_token = "ref",
+      expires_at = as.numeric(Sys.time()) + 600,
+      token_type = "Bearer", issuer = issuer, client_id = "other-cli"
+    ),
+    cache
+  )
+  testthat::local_mocked_bindings(
+    .vmx_oidc_discover = function(config) list(device = "https://auth.test/device", token = "https://auth.test/token"),
+    .vmx_oidc_device_flow = function(oauth_client, device_url, scopes) {
+      list(access_token = "acc_relogin", refresh_token = "ref_new", expires_in = 600, token_type = "Bearer")
+    }
+  )
+  expect_warning(
+    access <- vmx_oidc_access_token(can_prompt = TRUE),
+    "different provider"
+  )
+  expect_equal(access, "acc_relogin")
+  # The cache was overwritten with the newly-issued (matching-config) token.
+  expect_equal(.vmx_load_cached_token(cache)$client_id, "test-cli")
+})
+
+test_that("device-flow failures are wrapped as vmx_auth_error", {
+  cache <- withr::local_tempfile(fileext = ".json")
+  local_oidc_env(cache)
+  testthat::local_mocked_bindings(
+    .vmx_oidc_discover = function(config) list(device = "https://auth.test/device", token = "https://auth.test/token"),
+    .vmx_oidc_device_flow = function(oauth_client, device_url, scopes) {
+      stop("device authorization was denied by the user")
+    }
+  )
+  err <- tryCatch(vmx_login(), vmx_auth_error = function(e) e)
+  expect_s3_class(err, "vmx_auth_error")
+  expect_match(conditionMessage(err), "device-code login failed")
 })

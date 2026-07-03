@@ -16,8 +16,11 @@
 #' @keywords internal
 #' @noRd
 vmx_req <- function(client, path) {
+  # Resolve the bearer token *now*, per request, via the client's provider --
+  # a reused client thus re-reads the OIDC cache and silently refreshes a
+  # near-expired access token instead of sending a stale frozen one (GEN-2344).
   httr2::request(paste0(client$base_url, .vmx_api_prefix, path)) |>
-    httr2::req_auth_bearer_token(client$token) |>
+    httr2::req_auth_bearer_token(client$token_provider()) |>
     httr2::req_user_agent("vmxr (https://github.com/generable/vmxr)") |>
     httr2::req_error(is_error = function(resp) FALSE)
 }
