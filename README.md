@@ -65,6 +65,32 @@ nca   <- vmx_nca(dv, time_basis = "observed")
 vmx_nca_result(nca)
 ```
 
+### Sign in with OIDC (no PAT)
+
+Instead of a standing PAT you can authenticate with the OIDC **device-code**
+flow, entirely in R (no Python CLI needed). Configure the provider via
+environment variables — the same ones the `vmx` CLI reads — and call
+`vmx_login()`:
+
+```r
+# ~/.Renviron (or the workspace image sets these for you)
+#   VMX_API_BASE_URL   = https://vmx-api.staging.gnrbl.co
+#   VMX_OIDC_ISSUER    = https://auth.staging.gnrbl.co/application/o/generable-staging-vmx-cli/
+#   VMX_OIDC_CLIENT_ID = generable-staging-vmx-cli
+
+library(vmxr)
+vmx_login()      # opens the approve page in a browser; approve once
+vmx_whoami()     # vmx_client() now auto-authenticates from the cached token
+```
+
+`vmx_login()` caches the token as plain JSON at `~/.config/vmx/oidc-token.json`
+(the CLI's path and shape, `0600`), so **one login serves both R and the
+terminal CLI**. The refresh token is persisted on your home directory, so the
+access token is refreshed silently and the login **survives R / workspace
+restarts** — you sign in roughly once a month. When no `VMX_API_TOKEN` is set,
+`vmx_client()` (and every verb that builds one) authenticates from this cache
+automatically, prompting `vmx_login()` only when there's no usable cached token.
+
 ## Design
 
 The package exposes a curated, hand-written public API in `R/*.R` that adds

@@ -10,7 +10,8 @@ vmx_client(base_url = NULL, token = NULL, ...)
 \item{base_url}{API base URL. Defaults to \code{Sys.getenv("VMX_API_BASE_URL")}.}
 
 \item{token}{Authentik personal access token (PAT). Defaults to
-\code{Sys.getenv("VMX_API_TOKEN")}. Never hard-code a PAT in source.}
+\code{Sys.getenv("VMX_API_TOKEN")}, then to an OIDC access token (see
+\code{\link[=vmx_login]{vmx_login()}}). Never hard-code a PAT in source.}
 
 \item{...}{Reserved for future options (timeouts, retries, user agent).}
 }
@@ -22,4 +23,12 @@ Resolves connection config with the precedence: explicit args ->
 \code{VMX_API_BASE_URL} / \code{VMX_API_TOKEN} environment variables -> \verb{~/.Renviron}
 -> a classed error. The token is stored on the object but redacted in
 \code{\link[=print]{print()}} and never logged.
+}
+\details{
+When no token is supplied (neither \code{token=} nor \code{VMX_API_TOKEN}), the client
+\strong{auto-authenticates} via OIDC: it reads the token cached by \code{\link[=vmx_login]{vmx_login()}}
+(\verb{~/.config/vmx/oidc-token.json}), refreshing it silently when expired, and
+-- in an interactive session -- running \code{\link[=vmx_login]{vmx_login()}} if there is no usable
+cached token. This requires \code{VMX_OIDC_ISSUER} + \code{VMX_OIDC_CLIENT_ID} to be
+set; otherwise a \code{vmx_auth_error} names both auth methods.
 }
