@@ -186,15 +186,19 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
 }
 
 # Persist the token with owner-only (0600) perms. The cache holds a bearer +
-# refresh token, so it must never be group/world readable: create the temp file
-# 0600 *before* any secret bytes land, then atomically replace the target.
+# refresh token, so it must never be group/world readable. Tighten the umask to
+# 0177 for the write so the file is 0600 *from birth* (no umask-default window),
+# write to an unpredictable temp name in the same dir (no fixed-name symlink
+# target; same filesystem -> atomic rename), then replace the target.
 .vmx_save_cached_token <- function(token, path = .vmx_oidc_cache_path()) {
   dir <- dirname(path)
   if (!dir.exists(dir)) dir.create(dir, recursive = TRUE, showWarnings = FALSE, mode = "0700")
-  tmp <- paste0(path, ".tmp")
-  file.create(tmp, showWarnings = FALSE)
-  Sys.chmod(tmp, mode = "0600", use_umask = FALSE)
+  old_umask <- Sys.umask("0177")
+  on.exit(Sys.umask(old_umask), add = TRUE)
+  tmp <- tempfile(tmpdir = dir, fileext = ".tmp")
+  on.exit(if (file.exists(tmp)) unlink(tmp), add = TRUE)
   writeLines(.vmx_token_json(token), tmp)
+  Sys.chmod(tmp, mode = "0600", use_umask = FALSE)
   file.rename(tmp, path)
   Sys.chmod(path, mode = "0600", use_umask = FALSE)
   invisible(path)
@@ -360,10 +364,17 @@ vmx_oidc_access_token <- function(config = vmx_oidc_config(),
                                   cache_path = .vmx_oidc_cache_path(),
                                   can_prompt = interactive()) {
   token <- .vmx_load_cached_token(cache_path)
+  refresh_err <- NULL
   if (!is.null(token) && .vmx_token_matches(token, config)) {
     if (!.vmx_token_expired(token)) return(token$access_token)
     if (!is.null(token$refresh_token)) {
-      refreshed <- tryCatch(.vmx_oidc_refresh_flow(config, token), error = function(e) NULL)
+      refreshed <- tryCatch(
+        .vmx_oidc_refresh_flow(config, token),
+        error = function(e) {
+          refresh_err <<- conditionMessage(e)
+          NULL
+        }
+      )
       if (!is.null(refreshed)) {
         .vmx_save_cached_token(refreshed, cache_path)
         return(refreshed$access_token)
@@ -371,13 +382,14 @@ vmx_oidc_access_token <- function(config = vmx_oidc_config(),
     }
   }
   if (!isTRUE(can_prompt)) {
-    vmx_abort(
-      paste0(
-        "No usable cached OIDC token and not in an interactive session. Run ",
-        "`vmx_login()` interactively (or set `token=` / VMX_API_TOKEN)."
-      ),
-      class = "vmx_auth_error"
+    msg <- paste0(
+      "No usable cached OIDC token and not in an interactive session. Run ",
+      "`vmx_login()` interactively (or set `token=` / VMX_API_TOKEN)."
     )
+    # Surface *why* a silent refresh failed (revoked/expired refresh token,
+    # network) instead of collapsing every cause into the generic message.
+    if (!is.null(refresh_err)) msg <- paste0(msg, " (token refresh failed: ", refresh_err, ")")
+    vmx_abort(msg, class = "vmx_auth_error")
   }
   token <- vmx_login(
     issuer = config$issuer, client_id = config$client_id,
