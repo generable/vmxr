@@ -43,8 +43,12 @@ test_that("vmx_login runs the device flow and caches a CLI-shaped token 0600", {
   )
   expect_equal(on_disk$client_id, "test-cli")
 
-  # Secret cache must be owner-only.
-  expect_equal(as.character(file.info(cache)$mode), "600")
+  # Secret cache must be owner-only. POSIX file modes only exist on unix; on
+  # Windows file.info()$mode reflects the read-only bit, not 0600, and the
+  # deployment target (the Linux home PVC) is unix, so scope the assertion.
+  if (.Platform$OS.type != "windows") {
+    expect_equal(as.character(file.info(cache)$mode), "600")
+  }
 })
 
 test_that("default scopes request offline_access (needed for a refresh token)", {
