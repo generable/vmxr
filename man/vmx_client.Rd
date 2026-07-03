@@ -31,4 +31,11 @@ When no token is supplied (neither \code{token=} nor \code{VMX_API_TOKEN}), the 
 -- in an interactive session -- running \code{\link[=vmx_login]{vmx_login()}} if there is no usable
 cached token. This requires \code{VMX_OIDC_ISSUER} + \code{VMX_OIDC_CLIENT_ID} to be
 set; otherwise a \code{vmx_auth_error} names both auth methods.
+
+The bearer token is resolved \strong{per request}, not frozen at construction: a
+PAT is constant, but an OIDC access token is short-lived (~5-10 min), so a
+long-lived \code{con <- vmx_client()} re-resolves each request and silently
+refreshes from the cached refresh token when the access token is near expiry.
+This lets a reused client keep working across a full analysis session without
+re-login (GEN-2344).
 }
