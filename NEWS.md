@@ -1,5 +1,15 @@
 # vmxr 0.1.1.9000 (development)
 
+* `vmx_login()` device-code prompt now matches the actual flow (GEN-2378).
+  Because the browser is opened at `verification_uri_complete` (the URL that
+  already embeds the `user_code`), the consent page shows the code **pre-filled**
+  and never asks the user to paste it. `vmx_login()` now prints its own guidance
+  before the flow — "check the code shown in the browser matches, then approve",
+  plus a note that you may not be prompted to paste it — reframing the misleading
+  "copy … and paste when requested" line that upstream `httr2` prints. The
+  guidance shows only in the interactive/browser branch; the non-interactive
+  fallback (plain `verification_uri`, where you *do* enter the code) is left to
+  httr2's accurate "Visit … and enter code" message.
 * OIDC access tokens now self-heal on a reused client (GEN-2344). `vmx_client()`
   no longer freezes the OIDC access token at construction: the bearer token is
   resolved **per request** via a provider closure, so a long-lived
