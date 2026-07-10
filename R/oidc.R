@@ -276,6 +276,39 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
   httr2::oauth_client(id = config$client_id, token_url = token_endpoint, auth = "body")
 }
 
+# Pre-frame httr2's device-code prompt so it matches what actually happens here
+# (GEN-2378). httr2::oauth_flow_device() hard-codes, in its *interactive* branch,
+#   "Copy <code> and paste when requested by the browser"
+# (r-lib/httr2 R/oauth-flow-device.R) -- but it opens `verification_uri_complete`,
+# the URL that already embeds the `user_code`, so Authentik's consent page shows
+# the code pre-filled and never asks the user to paste it. That "copy ... and
+# paste" line therefore describes a step that doesn't happen. We can't reword or
+# suppress httr2's line (no override argument; it wraps a bare readline), so we
+# print our own guidance immediately before it, reframing the step as "verify the
+# code matches, then approve" and warning that no paste prompt may appear.
+#
+# Only the interactive/browser branch is misleading. When httr2 runs
+# non-interactively it instead prints "Visit <url> and enter code <code>" against
+# the plain `verification_uri` (no embedded code), where entering the code IS the
+# real step -- so we stay silent there and let httr2's accurate instruction stand
+# (the paste/enter guidance belongs only on that fallback branch). We gate on the
+# same predicate httr2 uses for `open_browser` (rlang::is_interactive()) so our
+# framing tracks its branch exactly.
+.vmx_oidc_device_prompt <- function(interactive = rlang::is_interactive()) {
+  if (!isTRUE(interactive)) {
+    return(invisible())
+  }
+  cli::cli_bullets(c(
+    "i" = "A browser window will open to confirm your VeloMetrix sign-in.",
+    "*" = "Check that the security code shown in the browser matches the code printed below, then approve the request.",
+    "i" = paste0(
+      "You may not be prompted to enter or paste the code \u2014 it's ",
+      "already included in the sign-in URL, so the page may show it pre-filled."
+    )
+  ))
+  invisible()
+}
+
 # Wrap httr2's RFC 8628 device-code flow in a mockable binding. Kept minimal so
 # tests can stub it (the real flow opens a browser and blocks on polling).
 .vmx_oidc_device_flow <- function(oauth_client, device_url, scopes) {
@@ -356,6 +389,10 @@ vmx_login <- function(issuer = NULL, client_id = NULL, scopes = NULL,
   cache_path <- cache_path %||% .vmx_oidc_cache_path()
   endpoints <- .vmx_oidc_discover(config)
   oauth_client <- .vmx_oidc_client(config, endpoints$token)
+  # Reframe httr2's misleading "copy & paste the code" prompt before it prints
+  # (GEN-2378): the browser opens the pre-filled URL, so the user verifies and
+  # approves rather than pasting.
+  .vmx_oidc_device_prompt()
   raw <- tryCatch(
     .vmx_oidc_device_flow(oauth_client, endpoints$device, config$scopes),
     error = function(e) {

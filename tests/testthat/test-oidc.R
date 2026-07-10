@@ -318,3 +318,51 @@ test_that("device-flow failures are wrapped as vmx_auth_error", {
   expect_s3_class(err, "vmx_auth_error")
   expect_match(conditionMessage(err), "device-code login failed")
 })
+
+# -- GEN-2378: device-code prompt wording ------------------------------------
+# httr2::oauth_flow_device() hard-codes a "Copy <code> and paste when requested"
+# line, but it opens the pre-filled verification_uri_complete, so no paste ever
+# happens. .vmx_oidc_device_prompt() pre-frames that as verify-and-approve in the
+# interactive/browser branch, and stays silent in the non-interactive branch
+# (where httr2's own "Visit <url> and enter code" instruction is accurate).
+
+test_that("device prompt reframes the browser flow as verify-and-approve (GEN-2378)", {
+  # Widen cli + collapse whitespace so console line-wrapping can't split a phrase
+  # mid-word and break the substring matches below.
+  withr::local_options(cli.width = 10000)
+  out <- gsub("\\s+", " ", paste(cli::cli_fmt(.vmx_oidc_device_prompt(interactive = TRUE)), collapse = " "))
+  # Tells the user to verify the code matches and approve -- not to paste it.
+  expect_match(out, "matches", ignore.case = TRUE)
+  expect_match(out, "approve", ignore.case = TRUE)
+  # The modified note: warn that no paste/enter prompt may appear (code pre-filled).
+  expect_match(out, "pre-filled", ignore.case = TRUE)
+  expect_match(out, "may not be prompted", ignore.case = TRUE)
+  # It must NOT instruct copy-and-paste (the misleading step this issue removes).
+  expect_false(grepl("paste when requested", out, ignore.case = TRUE))
+})
+
+test_that("device prompt stays silent in the non-interactive fallback branch (GEN-2378)", {
+  # httr2 prints "Visit <url> and enter code <code>" there, which is accurate, so
+  # vmxr adds nothing (the paste/enter instruction belongs only on that branch).
+  expect_identical(cli::cli_fmt(.vmx_oidc_device_prompt(interactive = FALSE)), character(0))
+})
+
+test_that("vmx_login shows the reframed device guidance before running the flow (GEN-2378)", {
+  cache <- withr::local_tempfile(fileext = ".json")
+  local_oidc_env(cache)
+  seen <- character(0)
+  testthat::local_mocked_bindings(
+    .vmx_oidc_discover = function(config) list(device = "https://auth.test/device", token = "https://auth.test/token"),
+    # Record ordering: the guidance must precede the (browser-opening) flow.
+    .vmx_oidc_device_prompt = function(interactive = rlang::is_interactive()) {
+      seen <<- c(seen, "prompt")
+      invisible()
+    },
+    .vmx_oidc_device_flow = function(oauth_client, device_url, scopes) {
+      seen <<- c(seen, "flow")
+      list(access_token = "acc", refresh_token = "ref", expires_in = 600, token_type = "Bearer")
+    }
+  )
+  suppressMessages(vmx_login())
+  expect_identical(seen, c("prompt", "flow"))
+})
