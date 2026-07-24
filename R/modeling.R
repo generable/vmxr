@@ -198,24 +198,19 @@ vmx_pd_markers <- function(x) {
 
 #' List model build runs
 #' @param data_version,study,treatment,status Optional filters.
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return One server-owned page as a tibble.
+#' @return A tibble containing all matching model-build runs.
 #' @export
 vmx_model_build_runs <- function(data_version = NULL, study = NULL,
                                  treatment = NULL, status = NULL,
-                                 client = vmx_client(),
-                                 cursor = NULL, limit = NULL) {
+                                 client = vmx_client()) {
   params <- list(
     data_version_id = vmx_opt_id(data_version, "dv", "data_version"),
     study_id = vmx_opt_id(study, "std", "study"),
     treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
-    status = status,
-    cursor = cursor,
-    limit = limit
+    status = status
   )
-  vmx_get_page(client, "/model-build-runs", params)
+  vmx_paginate(client, "/model-build-runs", params)
 }
 
 #' Build-run status
@@ -233,19 +228,16 @@ vmx_model_build_status <- function(run, client = vmx_client()) {
 #' Build-run logs
 #' @param run A build-run id or object.
 #' @param order Newest-first (`"desc"`) or oldest-first (`"asc"`).
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return One server-owned page of log lines as a tibble.
+#' @return A tibble containing all log lines in the requested order.
 #' @export
 vmx_model_build_logs <- function(run, client = vmx_client(),
-                                 order = c("desc", "asc"), cursor = NULL,
-                                 limit = NULL) {
+                                 order = c("desc", "asc")) {
   order <- match.arg(order)
-  vmx_get_page(
+  vmx_paginate(
     client,
     paste0("/model-build-runs/", vmx_id(run, "run"), "/logs"),
-    list(order = order, cursor = cursor, limit = limit)
+    list(order = order)
   )
 }
 
@@ -349,18 +341,21 @@ vmx_model_build_artifacts <- function(run, dest = ".", client = vmx_client()) {
 # ---- Fits ------------------------------------------------------------------
 
 #' List model fits
-#' @param run,data_version,treatment,study,model_type,marker_name,
-#'   source_pk_model_fit,status Optional filters.
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
+#' @param run Optional model-build run filter.
+#' @param data_version Optional data-version filter.
+#' @param treatment Optional treatment filter.
+#' @param study Optional study filter.
+#' @param model_type Optional model-type filter.
+#' @param marker_name Optional marker-name filter.
+#' @param source_pk_model_fit Optional source PK model-fit filter.
+#' @param status Optional model-fit status filter.
 #' @param client A `vmx_client`.
-#' @return One server-owned page as a tibble.
+#' @return A tibble containing all matching model fits.
 #' @export
 vmx_model_fits <- function(run = NULL, data_version = NULL, model_type = NULL,
                            marker_name = NULL, status = NULL,
                            client = vmx_client(), treatment = NULL, study = NULL,
-                           source_pk_model_fit = NULL, cursor = NULL,
-                           limit = NULL) {
+                           source_pk_model_fit = NULL) {
   params <- list(
     run_id = vmx_opt_id(run, "run", "run"),
     data_version_id = vmx_opt_id(data_version, "dv", "data_version"),
@@ -371,11 +366,9 @@ vmx_model_fits <- function(run = NULL, data_version = NULL, model_type = NULL,
     source_pk_model_fit_id = vmx_opt_id(
       source_pk_model_fit, "mf", "source_pk_model_fit"
     ),
-    status = status,
-    cursor = cursor,
-    limit = limit
+    status = status
   )
-  vmx_get_page(client, "/model-fits", params)
+  vmx_paginate(client, "/model-fits", params)
 }
 
 #' Fetch one model fit's details

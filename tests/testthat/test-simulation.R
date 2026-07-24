@@ -165,7 +165,6 @@ test_that("vmx_sim_jobs lists jobs for a fit", {
   ))))
   out <- vmx_sim_jobs("mf_1", client = con)
   expect_equal(out$simulation_job_id, "simjob_1")
-  expect_false(vmx_has_next_page(out))
 })
 
 test_that("vmx_sim_status / cancel type the result", {

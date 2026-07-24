@@ -13,22 +13,30 @@ vmx_model_fits(
   client = vmx_client(),
   treatment = NULL,
   study = NULL,
-  source_pk_model_fit = NULL,
-  cursor = NULL,
-  limit = NULL
+  source_pk_model_fit = NULL
 )
 }
 \arguments{
-\item{run, data_version, treatment, study, model_type, marker_name, }{source_pk_model_fit,status Optional filters.}
+\item{run}{Optional model-build run filter.}
+
+\item{data_version}{Optional data-version filter.}
+
+\item{model_type}{Optional model-type filter.}
+
+\item{marker_name}{Optional marker-name filter.}
+
+\item{status}{Optional model-fit status filter.}
 
 \item{client}{A \code{vmx_client}.}
 
-\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+\item{treatment}{Optional treatment filter.}
 
-\item{limit}{Server page-size hint (1--200).}
+\item{study}{Optional study filter.}
+
+\item{source_pk_model_fit}{Optional source PK model-fit filter.}
 }
 \value{
-One server-owned page as a tibble.
+A tibble containing all matching model fits.
 }
 \description{
 List model fits

@@ -4,13 +4,7 @@
 \alias{vmx_datasets}
 \title{List datasets}
 \usage{
-vmx_datasets(
-  study = NULL,
-  treatment = NULL,
-  client = vmx_client(),
-  cursor = NULL,
-  limit = NULL
-)
+vmx_datasets(study = NULL, treatment = NULL, client = vmx_client())
 }
 \arguments{
 \item{study}{Optional study filter.}
@@ -18,13 +12,9 @@ vmx_datasets(
 \item{treatment}{Optional treatment filter.}
 
 \item{client}{A \code{vmx_client}.}
-
-\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
-
-\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-One server-owned page as a tibble.
+A tibble containing all matching datasets.
 }
 \description{
 List datasets

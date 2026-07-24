@@ -5,25 +5,20 @@
 #' @param study Optional study filter.
 #' @param include_archived Include archived versions.
 #' @param eligible_for_modeling Optional modeling-eligibility filter.
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return One server-owned page as a tibble.
+#' @return A tibble containing all matching data versions.
 #' @export
 vmx_data_versions <- function(treatment = NULL, study = NULL,
                               include_archived = FALSE,
                               eligible_for_modeling = NULL,
-                              client = vmx_client(),
-                              cursor = NULL, limit = NULL) {
+                              client = vmx_client()) {
   params <- list(
     treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
     study_id = vmx_opt_id(study, "std", "study"),
     include_archived = include_archived,
-    eligible_for_modeling = eligible_for_modeling,
-    cursor = cursor,
-    limit = limit
+    eligible_for_modeling = eligible_for_modeling
   )
-  vmx_get_page(client, "/data-versions", params)
+  vmx_paginate(client, "/data-versions", params)
 }
 
 #' Fetch one data version

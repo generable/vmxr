@@ -1,9 +1,9 @@
-# vmxr 0.2.0.9000 (development)
+# vmxr 0.2.0
 
-* Collection functions now return exactly one server-owned cursor page instead
-  of loading every page implicitly. `cursor`/`limit` arguments and
-  `vmx_next_cursor()`/`vmx_has_next_page()` support explicit traversal without
-  shifting existing positional `client` arguments.
+* Collection functions continue to return all matching rows. Cursor pages are
+  followed automatically with strict envelope validation and repeated-cursor
+  detection, so malformed pagination fails instead of truncating results or
+  looping forever.
 * Estimate helpers now preserve the server-selected point statistic, interval
   kind, interval level, and additive tagged metadata. They no longer hardcode
   posterior/credible semantics or silently pad malformed parallel arrays.

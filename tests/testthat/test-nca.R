@@ -16,21 +16,22 @@ capture_req <- function(body) {
   env
 }
 
-test_that("vmx_nca_analyses returns one server-owned page", {
+test_that("vmx_nca_analyses returns all server-owned pages", {
   env <- new.env()
+  i <- 0L
   httr2::local_mocked_responses(function(req) {
     env$req <- req
+    i <<- i + 1L
     httr2::response_json(body = list(
-      items = list(nca_item("nca_1", "completed")),
-      next_cursor = "opaque-next-page",
-      has_next_page = TRUE
+      items = list(nca_item(paste0("nca_", i), "completed")),
+      next_cursor = if (i == 1L) "opaque-next-page" else NA_character_,
+      has_next_page = i == 1L
     ))
   })
   tbl <- vmx_nca_analyses(data_version = "dv_1", client = con)
-  expect_equal(nrow(tbl), 1L)
+  expect_equal(tbl$nca_id, c("nca_1", "nca_2"))
   expect_match(env$req$url, "data_version_id=dv_1")
-  expect_equal(vmx_next_cursor(tbl), "opaque-next-page")
-  expect_true(vmx_has_next_page(tbl))
+  expect_match(env$req$url, "cursor=opaque-next-page")
 })
 
 test_that("vmx_nca creates without waiting and posts the right body", {

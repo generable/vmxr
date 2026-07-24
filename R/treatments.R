@@ -2,19 +2,11 @@
 
 #' List treatments
 #' @param status Optional status filter.
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return One server-owned page as a tibble. Use [vmx_next_cursor()] and
-#'   [vmx_has_next_page()] to traverse further pages.
+#' @return A tibble containing all matching treatments.
 #' @export
-vmx_treatments <- function(status = NULL, client = vmx_client(),
-                           cursor = NULL, limit = NULL) {
-  vmx_get_page(
-    client,
-    "/treatments",
-    list(status = status, cursor = cursor, limit = limit)
-  )
+vmx_treatments <- function(status = NULL, client = vmx_client()) {
+  vmx_paginate(client, "/treatments", list(status = status))
 }
 
 #' Fetch one treatment

@@ -25,7 +25,7 @@ test_that("vmx_whoami parses /me into a typed object", {
   expect_equal(vmx_resource_id(me), "usr_1")
 })
 
-test_that("vmx_treatments returns one page and accepts its opaque cursor", {
+test_that("vmx_treatments automatically combines every cursor page", {
   urls <- character()
   i <- 0L
   httr2::local_mocked_responses(function(req) {
@@ -46,18 +46,13 @@ test_that("vmx_treatments returns one page and accepts its opaque cursor", {
     }
   })
 
-  first <- vmx_treatments(client = con)
-  expect_s3_class(first, "tbl_df")
-  expect_equal(first$treatment_id, "tmt_1")
-  expect_equal(vmx_next_cursor(first), "c1")
-  expect_true(vmx_has_next_page(first))
+  out <- vmx_treatments(status = "active", client = con)
+  expect_s3_class(out, "tbl_df")
+  expect_equal(out$treatment_id, c("tmt_1", "tmt_2"))
   # nested counts flattened to prefixed columns
-  expect_true(all(c("counts_studies", "counts_data_versions") %in% names(first)))
-
-  second <- vmx_treatments(cursor = vmx_next_cursor(first), client = con)
-  expect_equal(second$treatment_id, "tmt_2")
-  expect_null(vmx_next_cursor(second))
-  expect_false(vmx_has_next_page(second))
+  expect_true(all(c("counts_studies", "counts_data_versions") %in% names(out)))
+  expect_length(urls, 2L)
+  expect_true(all(grepl("status=active", urls, fixed = TRUE)))
   expect_match(urls[[2]], "cursor=c1")
 })
 
@@ -72,7 +67,7 @@ test_that("vmx_treatments returns an empty tibble when there are none", {
   expect_equal(nrow(vmx_treatments(client = con)), 0L)
 })
 
-test_that("collection pages reject inconsistent cursors and invalid limits", {
+test_that("collection pages reject inconsistent cursor metadata", {
   httr2::local_mocked_responses(list(
     httr2::response_json(body = list(
       items = list(),
@@ -84,10 +79,54 @@ test_that("collection pages reject inconsistent cursors and invalid limits", {
     vmx_treatments(client = con),
     class = "vmx_response_error"
   )
+})
+
+test_that("automatic pagination rejects repeated cursors", {
+  i <- 0L
+  httr2::local_mocked_responses(function(req) {
+    i <<- i + 1L
+    httr2::response_json(body = list(
+      items = list(tmt_item(paste0("tmt_", i), paste0("T", i))),
+      next_cursor = "same-cursor",
+      has_next_page = TRUE
+    ))
+  })
+
   expect_error(
-    vmx_treatments(client = con, limit = 201),
-    class = "vmx_usage_error"
+    vmx_treatments(client = con),
+    class = "vmx_response_error"
   )
+  expect_equal(i, 2L)
+})
+
+test_that("automatic pagination validates later and empty pages", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      items = list(),
+      next_cursor = "c1",
+      has_next_page = TRUE
+    )),
+    httr2::response_json(body = list(
+      items = list(tmt_item("tmt_2", "B")),
+      next_cursor = NA_character_,
+      has_next_page = FALSE
+    ))
+  ))
+  expect_equal(vmx_treatments(client = con)$treatment_id, "tmt_2")
+
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      items = list(tmt_item("tmt_1", "A")),
+      next_cursor = "c1",
+      has_next_page = TRUE
+    )),
+    httr2::response_json(body = list(
+      items = list(),
+      next_cursor = "c2",
+      has_next_page = FALSE
+    ))
+  ))
+  expect_error(vmx_treatments(client = con), class = "vmx_response_error")
 })
 
 test_that("single-resource responses must match the requested id", {

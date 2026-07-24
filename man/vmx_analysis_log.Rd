@@ -14,9 +14,7 @@ vmx_analysis_log(
   resource = NULL,
   client = vmx_client(),
   event_code = NULL,
-  requires_staff_review = NULL,
-  cursor = NULL,
-  limit = NULL
+  requires_staff_review = NULL
 )
 }
 \arguments{
@@ -40,15 +38,11 @@ ISO-8601 UTC) or an ISO-8601 string.}
 \item{event_code}{Optional event-code filter.}
 
 \item{requires_staff_review}{Optional staff-review filter.}
-
-\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
-
-\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-One newest-first server-owned page as a tibble.
+A tibble containing all matching events, newest first.
 }
 \description{
-\code{GET /studies/{std_id}/analysis-log} — one server-owned page of the unified
-newest-first event feed, with a \code{kind} discriminator per row.
+\code{GET /studies/{std_id}/analysis-log} — the complete unified newest-first
+event feed, with a \code{kind} discriminator per row.
 }

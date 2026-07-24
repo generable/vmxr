@@ -29,7 +29,7 @@ dv_item <- function(id, study = "std_1") {
        source_dataset_id = "ds_1", status = "ready", eligible_for_modeling = TRUE)
 }
 
-test_that("vmx_studies returns one filtered page and accepts its cursor", {
+test_that("vmx_studies combines filtered pages automatically", {
   cm <- capturing_mock(list(
     list(
       items = list(study_item("std_1", "A")),
@@ -43,19 +43,8 @@ test_that("vmx_studies returns one filtered page and accepts its cursor", {
     )
   ))
   httr2::local_mocked_responses(cm$mock)
-  first <- vmx_studies("tmt_1", client = con)
-  expect_equal(first$study_id, "std_1")
-  expect_equal(vmx_next_cursor(first), "c1")
-  expect_true(vmx_has_next_page(first))
-
-  second <- vmx_studies(
-    "tmt_1",
-    cursor = vmx_next_cursor(first),
-    client = con
-  )
-  expect_equal(second$study_id, "std_2")
-  expect_null(vmx_next_cursor(second))
-  expect_false(vmx_has_next_page(second))
+  out <- vmx_studies("tmt_1", client = con)
+  expect_equal(out$study_id, c("std_1", "std_2"))
   # treatment_id forwarded as a query param
   expect_match(cm$captured$req$url, "treatment_id=tmt_1")
   expect_match(cm$captured$req$url, "cursor=c1")
