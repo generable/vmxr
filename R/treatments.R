@@ -2,12 +2,19 @@
 
 #' List treatments
 #' @param status Optional status filter.
+#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
+#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return A tibble, one row per treatment.
+#' @return One server-owned page as a tibble. Use [vmx_next_cursor()] and
+#'   [vmx_has_next_page()] to traverse further pages.
 #' @export
-vmx_treatments <- function(status = NULL, client = vmx_client()) {
-  items <- vmx_paginate(client, "/treatments", list(status = status))
-  vmx_items_to_tibble(items)
+vmx_treatments <- function(status = NULL, client = vmx_client(),
+                           cursor = NULL, limit = NULL) {
+  vmx_get_page(
+    client,
+    "/treatments",
+    list(status = status, cursor = cursor, limit = limit)
+  )
 }
 
 #' Fetch one treatment
@@ -16,7 +23,9 @@ vmx_treatments <- function(status = NULL, client = vmx_client()) {
 #' @return A `vmx_treatment`.
 #' @export
 vmx_treatment <- function(id, client = vmx_client()) {
-  data <- vmx_get(client, paste0("/treatments/", vmx_id(id, "tmt")))
+  treatment_id <- vmx_id(id, "tmt")
+  data <- vmx_get(client, paste0("/treatments/", treatment_id))
+  vmx_validate_response_id(data, "treatment_id", treatment_id, "treatment")
   new_vmx_resource(data, "vmx_treatment", "treatment_id")
 }
 
@@ -44,7 +53,54 @@ vmx_treatment_create <- function(name, indication = NULL, description = NULL,
 #' @return A `vmx_treatment`.
 #' @export
 vmx_treatment_update <- function(id, ..., client = vmx_client()) {
-  body <- vmx_compact(list(...))
-  data <- vmx_put(client, paste0("/treatments/", vmx_id(id, "tmt")), body)
+  # Do not compact this body: an explicitly supplied NULL is JSON null and
+  # clears nullable fields; an omitted argument is absent from list(...).
+  body <- list(...)
+  vmx_validate_update_body(
+    body,
+    allowed = c("name", "indication", "description", "status"),
+    nullable = c("indication", "description"),
+    resource = "treatment"
+  )
+  treatment_id <- vmx_id(id, "tmt")
+  data <- vmx_put(client, paste0("/treatments/", treatment_id), body)
+  vmx_validate_response_id(
+    data, "treatment_id", treatment_id, "treatment update"
+  )
   new_vmx_resource(data, "vmx_treatment", "treatment_id")
+}
+
+vmx_validate_update_body <- function(body, allowed, nullable, resource) {
+  fields <- names(body)
+  if (is.null(fields) || any(!nzchar(fields)) || anyDuplicated(fields)) {
+    vmx_abort(
+      sprintf("The %s update must use unique named fields.", resource),
+      class = "vmx_usage_error"
+    )
+  }
+  unknown <- setdiff(fields, allowed)
+  if (length(unknown)) {
+    vmx_abort(
+      sprintf(
+        "Unknown %s update field%s: %s.",
+        resource,
+        if (length(unknown) == 1L) "" else "s",
+        paste(unknown, collapse = ", ")
+      ),
+      class = "vmx_usage_error"
+    )
+  }
+  invalid_null <- fields[vapply(body, is.null, logical(1)) & !fields %in% nullable]
+  if (length(invalid_null)) {
+    vmx_abort(
+      sprintf(
+        "%s update field%s cannot be NULL: %s.",
+        tools::toTitleCase(resource),
+        if (length(invalid_null) == 1L) "" else "s",
+        paste(invalid_null, collapse = ", ")
+      ),
+      class = "vmx_usage_error"
+    )
+  }
+  invisible(body)
 }

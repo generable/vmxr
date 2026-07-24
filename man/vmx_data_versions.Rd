@@ -9,7 +9,9 @@ vmx_data_versions(
   study = NULL,
   include_archived = FALSE,
   eligible_for_modeling = NULL,
-  client = vmx_client()
+  client = vmx_client(),
+  cursor = NULL,
+  limit = NULL
 )
 }
 \arguments{
@@ -22,9 +24,13 @@ vmx_data_versions(
 \item{eligible_for_modeling}{Optional modeling-eligibility filter.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+
+\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-A tibble.
+One server-owned page as a tibble.
 }
 \description{
 List data versions

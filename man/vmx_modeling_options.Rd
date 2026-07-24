@@ -17,7 +17,8 @@ vmx_modeling_options(
 
 \item{time_basis}{Time basis.}
 
-\item{pd_marker}{Optional PD marker gen_uuid(s) (character vector).}
+\item{pd_marker}{PD marker gen_uuid(s). \code{NULL} or \code{character(0)} explicitly
+previews a PK-only build; pass marker UUIDs to preview PD modeling.}
 
 \item{covariate}{Optional covariate name(s).}
 

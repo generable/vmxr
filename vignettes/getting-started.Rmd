@@ -54,12 +54,13 @@ vmx_nca_result(nca)
 dv <- vmx_data_version("dv_...")
 
 # tidy domain tables
-vmx_pk(dv)         # PK observations + events
+vmx_pk(dv)         # PK observations
+vmx_dosing(dv)     # dosing events
 vmx_subjects(dv)   # one row per subject (covariates)
 
 # or the whole bundle at once
 md <- vmx_model_data(dv)
-md$pk; md$subjects; md$meta
+md$pk; md$dosing; md$subjects; md$meta
 ```
 
 ## Fit a model and pull diagnostics
@@ -68,7 +69,7 @@ md$pk; md$subjects; md$meta
 run <- vmx_model_build(dv, time_basis = "observed", wait = TRUE)
 fit <- vmx_model_fits(run = run) |> dplyr::slice(1) |> dplyr::pull(model_fit_id) |> vmx_model_fit()
 
-vmx_fit_global_estimates(fit)   # population parameters + credible intervals
+vmx_fit_global_estimates(fit)   # population estimates + server-defined intervals
 vmx_fit_obs_vs_pred(fit)        # tidy observed-vs-predicted
 ```
 

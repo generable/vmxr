@@ -8,7 +8,7 @@
 #' Build a base request for a client
 #'
 #' Attaches the `/api/v1` prefix, bearer auth, and a user agent. HTTP error
-#' status is handled by [vmx_perform()] (not httr2's default), so the request
+#' status is handled by `vmx_perform()` (not httr2's default), so the request
 #' is configured not to raise on 4xx/5xx.
 #'
 #' @param client A `vmx_client`.
@@ -122,26 +122,31 @@ vmx_patch <- function(client, path, body = NULL) {
   vmx_perform(req)
 }
 
-#' Follow `next_cursor` pagination, returning all items as a flat list
+#' Fetch one canonical server-owned collection page
 #'
-#' @param limit Optional cap on the total number of items returned.
+#' The API contract owns page boundaries. This helper does not follow
+#' `next_cursor`; the opaque cursor and `has_next_page` flag are attached to
+#' the returned tibble by `vmx_page_to_tibble()`.
 #' @keywords internal
 #' @noRd
-vmx_paginate <- function(client, path, params = list(), limit = NULL) {
-  query <- vmx_compact(params)
-  items <- list()
-  repeat {
-    page <- vmx_get(client, path, query)
-    items <- c(items, page$items %||% list())
-    if (!is.null(limit) && length(items) >= limit) {
-      items <- items[seq_len(limit)]
-      break
-    }
-    cursor <- page$next_cursor
-    if (!is.character(cursor) || length(cursor) != 1L || !nzchar(cursor)) break
-    query$cursor <- cursor
+vmx_get_page <- function(client, path, params = list()) {
+  params <- vmx_compact(params)
+  if (!is.null(params$cursor)) {
+    vmx_id_like_scalar(params$cursor, "cursor")
   }
-  items
+  if (!is.null(params$limit)) {
+    if (!is.numeric(params$limit) || length(params$limit) != 1L ||
+        is.na(params$limit) || !is.finite(params$limit) ||
+        params$limit != floor(params$limit) ||
+        params$limit < 1L || params$limit > 200L) {
+      vmx_abort(
+        "`limit` must be one integer between 1 and 200.",
+        class = "vmx_usage_error"
+      )
+    }
+    params$limit <- as.integer(params$limit)
+  }
+  vmx_page_to_tibble(vmx_get(client, path, params), context = path)
 }
 
 #' Drop NULL-valued elements of a list
@@ -149,4 +154,15 @@ vmx_paginate <- function(client, path, params = list(), limit = NULL) {
 #' @noRd
 vmx_compact <- function(x) {
   x[!vapply(x, is.null, logical(1))]
+}
+
+# Validate an opaque cursor or similar non-blank scalar without interpreting it.
+vmx_id_like_scalar <- function(x, arg) {
+  if (!is.character(x) || length(x) != 1L || is.na(x) || !nzchar(x)) {
+    vmx_abort(
+      sprintf("`%s` must be one non-empty string.", arg),
+      class = "vmx_usage_error"
+    )
+  }
+  invisible(x)
 }

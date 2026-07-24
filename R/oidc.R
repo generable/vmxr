@@ -1,7 +1,7 @@
 # Native OIDC device-code authentication (GEN-2332).
 #
 # vmxr authenticates to vmx-api entirely in R via the OIDC device-code flow
-# (RFC 8628, run by httr2::oauth_flow_device) against the staging Authentik
+# (RFC 8628, run by httr2::oauth_flow_device) against the workspace's Authentik
 # vmx-cli provider -- no Python CLI dependency. `vmx_login()` runs the flow and
 # caches the token; `vmx_client()` auto-authenticates from that cache, silently
 # refreshing with the refresh token, and prompting a fresh login only when there
@@ -75,14 +75,37 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
 # is an absolute epoch-seconds deadline; `refresh_token` is NULL when absent.
 .vmx_token <- function(access_token, refresh_token, expires_at, token_type,
                        issuer, client_id) {
+  access_token <- .vmx_token_string(access_token, "access_token")
+  issuer <- .vmx_token_string(issuer, "issuer")
+  client_id <- .vmx_token_string(client_id, "client_id")
+  token_type <- .vmx_token_string(token_type %||% "Bearer", "token_type")
+  expires_at <- suppressWarnings(as.numeric(expires_at))
+  if (length(expires_at) != 1L || is.na(expires_at) || !is.finite(expires_at)) {
+    vmx_abort("OIDC token expiry is invalid.", class = "vmx_auth_error")
+  }
+  if (!is.null(refresh_token)) {
+    refresh_token <- .vmx_token_string(refresh_token, "refresh_token")
+  }
+
   list(
     access_token = access_token,
-    refresh_token = if (is.null(refresh_token) || !nzchar(refresh_token)) NULL else refresh_token,
-    expires_at = as.numeric(expires_at),
-    token_type = token_type %||% "Bearer",
+    refresh_token = refresh_token,
+    expires_at = expires_at,
+    token_type = token_type,
     issuer = sub("/+$", "", issuer),
     client_id = client_id
   )
+}
+
+.vmx_token_string <- function(value, field) {
+  if (!is.character(value) || length(value) != 1L || is.na(value) ||
+      !nzchar(trimws(value))) {
+    vmx_abort(
+      sprintf("OIDC token %s is invalid.", field),
+      class = "vmx_auth_error"
+    )
+  }
+  value
 }
 
 .vmx_token_expired <- function(token, now = as.numeric(Sys.time()),
@@ -98,11 +121,14 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
 # Build a token from a raw OAuth token-endpoint response body.
 .vmx_token_from_body <- function(config, body) {
   access <- body$access_token
-  if (!is.character(access) || !length(access) || !nzchar(access)) {
+  if (!is.character(access) || length(access) != 1L || is.na(access) ||
+      !nzchar(trimws(access))) {
     vmx_abort("OIDC token response did not contain an access_token.", class = "vmx_auth_error")
   }
   ttl <- suppressWarnings(as.numeric(body$expires_in %||% 300))
-  if (is.na(ttl)) ttl <- 300
+  if (length(ttl) != 1L || is.na(ttl) || !is.finite(ttl) || ttl <= 0) {
+    vmx_abort("OIDC token response contained an invalid expires_in.", class = "vmx_auth_error")
+  }
   .vmx_token(
     access_token = access,
     refresh_token = body$refresh_token,
@@ -116,14 +142,18 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
 # Build a token from the httr2_token object oauth_flow_device() returns.
 .vmx_token_from_httr2 <- function(config, token) {
   access <- token$access_token
-  if (is.null(access) || !nzchar(access)) {
+  if (!is.character(access) || length(access) != 1L || is.na(access) ||
+      !nzchar(trimws(access))) {
     vmx_abort("OIDC device-code flow returned no access token.", class = "vmx_auth_error")
   }
   expires_at <- token$expires_at
   if (is.null(expires_at)) {
     issued <- as.numeric(token$.date %||% Sys.time())
     ttl <- suppressWarnings(as.numeric(token$expires_in %||% 300))
-    if (is.na(ttl)) ttl <- 300
+    if (length(issued) != 1L || is.na(issued) || !is.finite(issued) ||
+        length(ttl) != 1L || is.na(ttl) || !is.finite(ttl) || ttl <= 0) {
+      vmx_abort("OIDC device-code flow returned an invalid token expiry.", class = "vmx_auth_error")
+    }
     expires_at <- issued + ttl
   }
   .vmx_token(
@@ -167,17 +197,19 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
 
 .vmx_token_from_json <- function(data) {
   need <- c("access_token", "expires_at", "issuer", "client_id")
-  if (!all(need %in% names(data))) stop("incomplete token cache", call. = FALSE)
+  if (!is.list(data) || !all(need %in% names(data))) {
+    stop("incomplete token cache", call. = FALSE)
+  }
   .vmx_token(
-    access_token = as.character(data[["access_token"]]),
+    access_token = data[["access_token"]],
     refresh_token = {
       rt <- data[["refresh_token"]]
-      if (is.null(rt) || !length(rt) || is.na(rt[1])) NULL else as.character(rt[1])
+      if (is.null(rt) || !length(rt) || is.na(rt[1])) NULL else rt
     },
-    expires_at = as.numeric(data[["expires_at"]]),
-    token_type = as.character(data[["token_type"]] %||% "Bearer"),
-    issuer = as.character(data[["issuer"]]),
-    client_id = as.character(data[["client_id"]])
+    expires_at = data[["expires_at"]],
+    token_type = data[["token_type"]] %||% "Bearer",
+    issuer = data[["issuer"]],
+    client_id = data[["client_id"]]
   )
 }
 
@@ -197,16 +229,56 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
 # write to an unpredictable temp name in the same dir (no fixed-name symlink
 # target; same filesystem -> atomic rename), then replace the target.
 .vmx_save_cached_token <- function(token, path = .vmx_oidc_cache_path()) {
+  token <- .vmx_token(
+    access_token = token$access_token,
+    refresh_token = token$refresh_token,
+    expires_at = token$expires_at,
+    token_type = token$token_type,
+    issuer = token$issuer,
+    client_id = token$client_id
+  )
   dir <- dirname(path)
-  if (!dir.exists(dir)) dir.create(dir, recursive = TRUE, showWarnings = FALSE, mode = "0700")
+  if (!dir.exists(dir) &&
+      !dir.create(dir, recursive = TRUE, showWarnings = FALSE, mode = "0700")) {
+    vmx_abort("Could not create the OIDC token-cache directory.", class = "vmx_auth_error")
+  }
   old_umask <- Sys.umask("0177")
   on.exit(Sys.umask(old_umask), add = TRUE)
   tmp <- tempfile(tmpdir = dir, fileext = ".tmp")
   on.exit(if (file.exists(tmp)) unlink(tmp), add = TRUE)
-  writeLines(.vmx_token_json(token), tmp)
-  Sys.chmod(tmp, mode = "0600", use_umask = FALSE)
-  file.rename(tmp, path)
-  Sys.chmod(path, mode = "0600", use_umask = FALSE)
+  tryCatch(
+    writeLines(.vmx_token_json(token), tmp),
+    error = function(e) {
+      vmx_abort(
+        "Could not write the OIDC token cache.",
+        class = "vmx_auth_error",
+        parent = e
+      )
+    }
+  )
+  .vmx_secure_token_file(tmp)
+  if (!.vmx_atomic_rename(tmp, path)) {
+    vmx_abort(
+      "Could not atomically replace the OIDC token cache.",
+      class = "vmx_auth_error"
+    )
+  }
+  .vmx_secure_token_file(path)
+  invisible(path)
+}
+
+.vmx_atomic_rename <- function(from, to) {
+  file.rename(from, to)
+}
+
+.vmx_secure_token_file <- function(path) {
+  if (.Platform$OS.type != "windows" &&
+      !isTRUE(Sys.chmod(path, mode = "0600", use_umask = FALSE))) {
+    vmx_abort(
+      "Could not restrict permissions on the OIDC token cache.",
+      class = "vmx_auth_error"
+    )
+  }
   invisible(path)
 }
 
@@ -360,14 +432,13 @@ vmx_oidc_config <- function(issuer = NULL, client_id = NULL, scopes = NULL) {
 #' same path and shape the `vmx` CLI uses, with `0600` permissions), so one
 #' `vmx_login()` serves both R and the terminal CLI and the session survives a
 #' fresh R process or workspace pod restart. Because the refresh token is
-#' persisted on the home PVC, you log in **once per refresh-token lifetime**
-#' (~30 days).
+#' persisted on the home PVC, you log in once per provider-configured
+#' refresh-token lifetime.
 #'
 #' Configuration is read from environment variables (matching the CLI):
 #' `VMX_OIDC_ISSUER`, `VMX_OIDC_CLIENT_ID`, and optionally `VMX_OIDC_SCOPES`.
-#' Confirmed-working staging values: issuer
-#' `https://auth.staging.gnrbl.co/application/o/generable-staging-vmx-cli/`,
-#' client id `generable-staging-vmx-cli`.
+#' Workspace deployments provision the issuer and client id; vmxr does not
+#' assume values from a different workspace or environment.
 #'
 #' @param issuer OIDC issuer base URL. Defaults to `VMX_OIDC_ISSUER`.
 #' @param client_id Public OIDC client id. Defaults to `VMX_OIDC_CLIENT_ID`.

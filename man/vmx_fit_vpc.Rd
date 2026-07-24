@@ -15,6 +15,8 @@ vmx_fit_vpc(fit, client = vmx_client())
 A list (the parsed artifact).
 }
 \description{
-Returns the parsed VPC artifact (per dose-group and per-subject quantile
-bands over time grids). Tibble reshaping is deferred; see the package NEWS.
+Returns the parsed Visual Predictive Check artifact. Its subject and
+dose-group channels contain model-implied response trajectories with the
+server-provided point statistic and interval. The nested wire shape is
+retained verbatim.
 }

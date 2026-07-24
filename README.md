@@ -12,10 +12,11 @@ modeling &rarr; simulation workflow in ergonomic, pipe-friendly verbs that
 Our users are pharmacometricians who work in R/RStudio; `vmxr` keeps the whole
 analysis next to their data instead of shuttling files and IDs through a shell.
 
-> **Status: functional (v0.1.1), pre-CRAN.** The client covers the full analysis
-> workflow end to end — treatments, studies, datasets & prep, data-versions,
+> **Status: functional (v0.2.0 development), pre-CRAN.** The client covers the full analysis
+> workflow end to end — treatments, studies, datasets and prep, data versions,
 > modeling-data tables, NCA, modeling (build runs, fits, estimates), simulation,
-> and the study analysis log — validated against the live API on staging.
+> and the study analysis log. Contract-shaped responses are covered by the
+> package test suite; a separate live smoke test is opt-in.
 > Deferred: the nlmixr2 / Stan·Torsten data adapters (`vmx_nlmixr_data()`,
 > `vmx_torsten_data()`), `vmx_dataset_download()`, and VPC-artifact tibble
 > reshaping — each needs validation against real data first and currently raises
@@ -31,7 +32,7 @@ Targets **API `0.2.x` / CLI `0.6.x`**.
 | Connect / identity | `vmx_client()`, `vmx_whoami()`, `vmx_health()` |
 | Treatments / studies | `vmx_treatments()`, `vmx_study_create()`, … |
 | Upload & prep | `vmx_upload()`, `vmx_prep_status()`, `vmx_prep_questions()`, `vmx_prep_answer()`, `vmx_wait()` |
-| Data versions | `vmx_data_versions()`, `vmx_data_version_create()`, `vmx_data_version_table()`, `vmx_subjects()`/`vmx_pk()`/`vmx_pd()`, `vmx_model_data()` |
+| Data versions | `vmx_data_versions()`, `vmx_data_version_create()`, `vmx_data_version_table()`, `vmx_subjects()`/`vmx_pk()`/`vmx_dosing()`/`vmx_pd()`, `vmx_model_data()` |
 | NCA | `vmx_nca()`, `vmx_nca_result()` |
 | Modeling | `vmx_model_build()`, `vmx_model_fits()`, `vmx_fit_subject_estimates()`, `vmx_fit_global_estimates()`, `vmx_fit_obs_vs_pred()` |
 | Simulation | `vmx_dosing_input()`, `vmx_sim_population()`, `vmx_sim_result()` |
@@ -73,10 +74,10 @@ environment variables — the same ones the `vmx` CLI reads — and call
 `vmx_login()`:
 
 ```r
-# ~/.Renviron (or the workspace image sets these for you)
-#   VMX_API_BASE_URL   = https://vmx-api.staging.gnrbl.co
-#   VMX_OIDC_ISSUER    = https://auth.staging.gnrbl.co/application/o/generable-staging-vmx-cli/
-#   VMX_OIDC_CLIENT_ID = generable-staging-vmx-cli
+# ~/.Renviron (normally provisioned by the workspace)
+#   VMX_API_BASE_URL   = <this workspace's API URL>
+#   VMX_OIDC_ISSUER    = <this workspace's OIDC issuer>
+#   VMX_OIDC_CLIENT_ID = <this workspace's public client id>
 
 library(vmxr)
 vmx_login()      # opens the approve page in a browser; approve once
@@ -87,14 +88,17 @@ vmx_whoami()     # vmx_client() now auto-authenticates from the cached token
 (the CLI's path and shape, `0600`), so **one login serves both R and the
 terminal CLI**. The refresh token is persisted on your home directory, so the
 access token is refreshed silently and the login **survives R / workspace
-restarts** — you sign in roughly once a month. When no `VMX_API_TOKEN` is set,
+restarts** for the provider-configured refresh-token lifetime. When no
+`VMX_API_TOKEN` is set,
 `vmx_client()` (and every verb that builds one) authenticates from this cache
 automatically, prompting `vmx_login()` only when there's no usable cached token.
 
 ## Design
 
 The package exposes a curated, hand-written public API in `R/*.R` that adds
-polling, pagination, multipart upload, and tibble/S3 conversion. The OpenAPI
+polling, server-owned cursor navigation, multipart upload, and tibble/S3
+conversion. Collection functions return one page; use `vmx_next_cursor()` and
+`vmx_has_next_page()` to request another page explicitly. The OpenAPI
 snapshot/codegen path is still a development task, not a shipped generated
 binding layer.
 
@@ -102,4 +106,4 @@ The client holds **no business logic**: the API is the single source of truth.
 
 ## License
 
-Proprietary — © Generable. See [LICENSE](LICENSE).
+Apache License 2.0 — © Generable. See [LICENSE.md](LICENSE.md).

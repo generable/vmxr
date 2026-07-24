@@ -80,6 +80,50 @@ test_that("a corrupt cache is treated as no token, not an error", {
   expect_null(.vmx_load_cached_token(cache))
 })
 
+test_that("a structurally invalid token cache is treated as corrupt", {
+  cache <- withr::local_tempfile(fileext = ".json")
+  invalid <- list(
+    list(
+      access_token = "", refresh_token = NULL, expires_at = 2000000000,
+      token_type = "Bearer", issuer = stripped_issuer, client_id = "test-cli"
+    ),
+    list(
+      access_token = "acc", refresh_token = NULL, expires_at = "not-a-number",
+      token_type = "Bearer", issuer = stripped_issuer, client_id = "test-cli"
+    ),
+    list(
+      access_token = "acc", refresh_token = NULL, expires_at = 2000000000,
+      token_type = "Bearer", issuer = "", client_id = "test-cli"
+    )
+  )
+
+  for (value in invalid) {
+    writeLines(
+      jsonlite::toJSON(value, auto_unbox = TRUE, null = "null", na = "null"),
+      cache
+    )
+    expect_null(.vmx_load_cached_token(cache))
+  }
+})
+
+test_that("token-cache replacement failure is a classed auth error", {
+  cache <- withr::local_tempfile(fileext = ".json")
+  token <- .vmx_token(
+    access_token = "acc", refresh_token = "ref",
+    expires_at = as.numeric(Sys.time()) + 600,
+    token_type = "Bearer", issuer = issuer, client_id = "test-cli"
+  )
+  testthat::local_mocked_bindings(
+    .vmx_atomic_rename = function(from, to) FALSE
+  )
+
+  expect_error(
+    .vmx_save_cached_token(token, cache),
+    "atomically replace",
+    class = "vmx_auth_error"
+  )
+})
+
 test_that("expired cached token is silently refreshed and re-cached", {
   cache <- withr::local_tempfile(fileext = ".json")
   local_oidc_env(cache)

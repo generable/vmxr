@@ -12,13 +12,14 @@
 #' @param treatment Optional treatment; inferred from `study` when possible.
 #' @param config Optional gecodata v2 `project.yaml` path (warm-start).
 #' @param wait If `TRUE`, block until prep settles.
+#' @param ... Polling controls forwarded to [vmx_wait()] when `wait = TRUE`.
 #' @param client A `vmx_client`.
 #' @return A `vmx_dataset` (status `"uploaded"`).
 #' @export
 vmx_upload <- function(study, files,
                        mode = c("initial", "incremental", "replacement"),
                        treatment = NULL, config = NULL, wait = FALSE,
-                       client = vmx_client()) {
+                       client = vmx_client(), ...) {
   mode <- match.arg(mode)
   std_id <- vmx_id(study, "std", arg = "study")
   tmt_id <- if (!is.null(treatment)) {
@@ -55,7 +56,7 @@ vmx_upload <- function(study, files,
     httr2::req_body_multipart(!!!parts, !!!file_parts)
   ds <- new_vmx_resource(vmx_perform(req), "vmx_dataset", "dataset_id")
 
-  if (isTRUE(wait)) vmx_wait(ds, client = client) else ds
+  if (isTRUE(wait)) vmx_wait(ds, client = client, ...) else ds
 }
 
 #' Resolve the treatment id that owns a study
@@ -66,31 +67,35 @@ vmx_upload <- function(study, files,
 #' @noRd
 vmx_study_treatment_id <- function(study, client) {
   if (inherits(study, "vmx_resource") && !is.null(study[["treatment_id"]])) {
-    return(study[["treatment_id"]])
+    return(vmx_id(study[["treatment_id"]], "tmt", "study$treatment_id"))
   }
   std_id <- vmx_id(study, "std", arg = "study")
-  tmt_id <- vmx_get(client, paste0("/studies/", std_id))[["treatment_id"]]
-  if (is.null(tmt_id)) {
-    vmx_abort(
-      sprintf("Could not resolve the treatment for study '%s'; pass `treatment=`.", std_id),
-      class = "vmx_usage_error"
-    )
-  }
-  tmt_id
+  response <- vmx_get(client, paste0("/studies/", std_id))
+  vmx_validate_response_id(response, "study_id", std_id, "study")
+  vmx_id(
+    vmx_response_field(response, "treatment_id", "study.treatment_id"),
+    "tmt",
+    "study$treatment_id"
+  )
 }
 
 #' List datasets
 #' @param study Optional study filter.
 #' @param treatment Optional treatment filter.
+#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
+#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return A tibble.
+#' @return One server-owned page as a tibble.
 #' @export
-vmx_datasets <- function(study = NULL, treatment = NULL, client = vmx_client()) {
+vmx_datasets <- function(study = NULL, treatment = NULL, client = vmx_client(),
+                         cursor = NULL, limit = NULL) {
   params <- list(
     study_id = vmx_opt_id(study, "std", "study"),
-    treatment_id = vmx_opt_id(treatment, "tmt", "treatment")
+    treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
+    cursor = cursor,
+    limit = limit
   )
-  vmx_items_to_tibble(vmx_paginate(client, "/datasets", params))
+  vmx_get_page(client, "/datasets", params)
 }
 
 #' Fetch one dataset
@@ -99,18 +104,27 @@ vmx_datasets <- function(study = NULL, treatment = NULL, client = vmx_client()) 
 #' @return A `vmx_dataset`.
 #' @export
 vmx_dataset <- function(id, client = vmx_client()) {
-  data <- vmx_get(client, paste0("/datasets/", vmx_id(id, "ds")))
+  dataset_id <- vmx_id(id, "ds")
+  data <- vmx_get(client, paste0("/datasets/", dataset_id))
+  vmx_validate_response_id(data, "dataset_id", dataset_id, "dataset")
   new_vmx_resource(data, "vmx_dataset", "dataset_id")
 }
 
 #' List the files in a dataset
 #' @param dataset A dataset id or `vmx_dataset`.
+#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
+#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return A tibble.
+#' @return One server-owned page as a tibble.
 #' @export
-vmx_dataset_files <- function(dataset, client = vmx_client()) {
+vmx_dataset_files <- function(dataset, client = vmx_client(),
+                              cursor = NULL, limit = NULL) {
   id <- vmx_id(dataset, "ds", arg = "dataset")
-  vmx_items_to_tibble(vmx_paginate(client, paste0("/datasets/", id, "/files")))
+  vmx_get_page(
+    client,
+    paste0("/datasets/", id, "/files"),
+    list(cursor = cursor, limit = limit)
+  )
 }
 
 #' The tags on a dataset
@@ -145,7 +159,11 @@ vmx_dataset_tags <- function(dataset, client = vmx_client()) {
 #' @return The updated `vmx_prep_status`.
 #' @export
 vmx_dataset_cancel <- function(dataset, client = vmx_client()) {
-  data <- vmx_post(client, paste0("/datasets/", vmx_id(dataset, "ds", arg = "dataset"), "/cancel"))
+  dataset_id <- vmx_id(dataset, "ds", arg = "dataset")
+  data <- vmx_post(client, paste0("/datasets/", dataset_id, "/cancel"))
+  vmx_validate_response_id(
+    data, "dataset_id", dataset_id, "dataset cancellation"
+  )
   new_vmx_resource(data, "vmx_prep_status", "dataset_id")
 }
 
@@ -192,10 +210,14 @@ vmx_upload_unignore <- function(dataset, upload, client = vmx_client()) {
 vmx_set_upload_ignored <- function(dataset, upload, ignored, client) {
   endpoint <- if (ignored) "ignore-upload" else "unignore-upload"
   upload_id <- if (inherits(upload, "vmx_resource")) vmx_resource_id(upload) else upload
+  dataset_id <- vmx_id(dataset, "ds", arg = "dataset")
   data <- vmx_post(
     client,
-    paste0("/datasets/", vmx_id(dataset, "ds", arg = "dataset"), "/", endpoint),
+    paste0("/datasets/", dataset_id, "/", endpoint),
     list(upload_id = upload_id)
+  )
+  vmx_validate_response_id(
+    data, "dataset_id", dataset_id, "dataset upload update"
   )
   new_vmx_resource(data, "vmx_prep_status", "dataset_id")
 }

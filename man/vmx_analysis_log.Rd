@@ -12,7 +12,11 @@ vmx_analysis_log(
   severity = NULL,
   since = NULL,
   resource = NULL,
-  client = vmx_client()
+  client = vmx_client(),
+  event_code = NULL,
+  requires_staff_review = NULL,
+  cursor = NULL,
+  limit = NULL
 )
 }
 \arguments{
@@ -32,11 +36,19 @@ ISO-8601 UTC) or an ISO-8601 string.}
 \item{resource}{Optional resource id (or object) to scope to.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{event_code}{Optional event-code filter.}
+
+\item{requires_staff_review}{Optional staff-review filter.}
+
+\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+
+\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-A tibble.
+One newest-first server-owned page as a tibble.
 }
 \description{
-\code{GET /studies/{std_id}/analysis-log} — the unified newest-first event feed,
-auto-paginated into a tibble with a \code{kind} discriminator per row.
+\code{GET /studies/{std_id}/analysis-log} — one server-owned page of the unified
+newest-first event feed, with a \code{kind} discriminator per row.
 }

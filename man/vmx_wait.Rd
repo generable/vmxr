@@ -19,11 +19,16 @@ vmx_wait(
 types as the API surface lands: model-build-run, simulation-job).}
 
 \item{until}{Target terminal state(s); a sensible default per type when
-\code{NULL}.}
+\code{NULL}. An explicitly requested failure state is returned; any other
+terminal failure still raises immediately.}
 
-\item{timeout}{Timeout in seconds.}
+\item{timeout}{Timeout in seconds. Resource methods default to their worker
+execution ceiling plus a short persistence cushion (70 minutes for
+prep/NCA/dosing input, 130 minutes for simulation, and 24 hours 10 minutes
+for model builds).}
 
-\item{interval}{Poll interval in seconds (exponential backoff up to 30s).}
+\item{interval}{Positive poll interval in seconds (exponential backoff up
+to 30s).}
 
 \item{progress}{Show a progress message each poll; defaults to
 \code{\link[=interactive]{interactive()}}.}

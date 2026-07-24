@@ -4,15 +4,25 @@
 \alias{vmx_treatments}
 \title{List treatments}
 \usage{
-vmx_treatments(status = NULL, client = vmx_client())
+vmx_treatments(
+  status = NULL,
+  client = vmx_client(),
+  cursor = NULL,
+  limit = NULL
+)
 }
 \arguments{
 \item{status}{Optional status filter.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+
+\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-A tibble, one row per treatment.
+One server-owned page as a tibble. Use \code{\link[=vmx_next_cursor]{vmx_next_cursor()}} and
+\code{\link[=vmx_has_next_page]{vmx_has_next_page()}} to traverse further pages.
 }
 \description{
 List treatments

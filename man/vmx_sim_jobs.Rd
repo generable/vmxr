@@ -4,15 +4,19 @@
 \alias{vmx_sim_jobs}
 \title{List simulation jobs for a model fit}
 \usage{
-vmx_sim_jobs(fit, client = vmx_client())
+vmx_sim_jobs(fit, client = vmx_client(), cursor = NULL, limit = NULL)
 }
 \arguments{
 \item{fit}{A fit id or \code{vmx_model_fit}.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+
+\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-A tibble.
+One server-owned page as a tibble.
 }
 \description{
 List simulation jobs for a model fit
