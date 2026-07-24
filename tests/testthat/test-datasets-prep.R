@@ -115,6 +115,18 @@ test_that("vmx_dataset_tags handles no tags", {
   expect_equal(nrow(vmx_dataset_tags(ds)), 0L)
 })
 
+test_that("vmx_dataset_tags rejects malformed values", {
+  ds <- new_vmx_resource(
+    list(dataset_id = "ds_1", tags = list(name = list("nested"))),
+    "vmx_dataset",
+    "dataset_id"
+  )
+  expect_error(
+    vmx_dataset_tags(ds),
+    class = "vmx_response_error"
+  )
+})
+
 test_that("vmx_dataset_cancel posts and returns a prep-status", {
   env <- capture_one(list(dataset_id = "ds_1", status = "cancelled"))
   ps <- vmx_dataset_cancel("ds_1", client = con)
