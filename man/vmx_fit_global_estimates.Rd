@@ -15,5 +15,6 @@ vmx_fit_global_estimates(fit, client = vmx_client())
 A tibble.
 }
 \description{
-One row per parameter, with the point estimate and credible interval.
+One row per estimate, preserving the server-selected point statistic,
+interval kind, interval level, and tagged estimate metadata.
 }

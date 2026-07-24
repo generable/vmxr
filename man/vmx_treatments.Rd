@@ -12,7 +12,7 @@ vmx_treatments(status = NULL, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble, one row per treatment.
+A tibble containing all matching treatments.
 }
 \description{
 List treatments

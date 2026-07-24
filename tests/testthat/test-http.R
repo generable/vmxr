@@ -25,25 +25,139 @@ test_that("vmx_whoami parses /me into a typed object", {
   expect_equal(vmx_resource_id(me), "usr_1")
 })
 
-test_that("vmx_treatments follows pagination into one tibble", {
-  responses <- list(
-    httr2::response_json(body = list(items = list(tmt_item("tmt_1", "A")), next_cursor = "c1")),
-    httr2::response_json(body = list(items = list(tmt_item("tmt_2", "B")), next_cursor = NULL))
-  )
-  httr2::local_mocked_responses(responses)
-  tbl <- vmx_treatments(client = con)
-  expect_s3_class(tbl, "tbl_df")
-  expect_equal(nrow(tbl), 2L)
-  expect_equal(tbl$treatment_id, c("tmt_1", "tmt_2"))
+test_that("vmx_treatments automatically combines every cursor page", {
+  urls <- character()
+  i <- 0L
+  httr2::local_mocked_responses(function(req) {
+    urls <<- c(urls, req$url)
+    i <<- i + 1L
+    if (i == 1L) {
+      httr2::response_json(body = list(
+        items = list(tmt_item("tmt_1", "A")),
+        next_cursor = "c1",
+        has_next_page = TRUE
+      ))
+    } else {
+      httr2::response_json(body = list(
+        items = list(tmt_item("tmt_2", "B")),
+        next_cursor = NA_character_,
+        has_next_page = FALSE
+      ))
+    }
+  })
+
+  out <- vmx_treatments(status = "active", client = con)
+  expect_s3_class(out, "tbl_df")
+  expect_equal(out$treatment_id, c("tmt_1", "tmt_2"))
   # nested counts flattened to prefixed columns
-  expect_true(all(c("counts_studies", "counts_data_versions") %in% names(tbl)))
+  expect_true(all(c("counts_studies", "counts_data_versions") %in% names(out)))
+  expect_length(urls, 2L)
+  expect_true(all(grepl("status=active", urls, fixed = TRUE)))
+  expect_match(urls[[2]], "cursor=c1")
 })
 
 test_that("vmx_treatments returns an empty tibble when there are none", {
   httr2::local_mocked_responses(list(
-    httr2::response_json(body = list(items = list(), next_cursor = NULL))
+    httr2::response_json(body = list(
+      items = list(),
+      next_cursor = NA_character_,
+      has_next_page = FALSE
+    ))
   ))
   expect_equal(nrow(vmx_treatments(client = con)), 0L)
+})
+
+test_that("collection pages reject inconsistent cursor metadata", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      items = list(),
+      next_cursor = "unexpected",
+      has_next_page = FALSE
+    ))
+  ))
+  expect_error(
+    vmx_treatments(client = con),
+    class = "vmx_response_error"
+  )
+})
+
+test_that("automatic pagination rejects repeated cursors", {
+  i <- 0L
+  httr2::local_mocked_responses(function(req) {
+    i <<- i + 1L
+    httr2::response_json(body = list(
+      items = list(tmt_item(paste0("tmt_", i), paste0("T", i))),
+      next_cursor = "same-cursor",
+      has_next_page = TRUE
+    ))
+  })
+
+  expect_error(
+    vmx_treatments(client = con),
+    class = "vmx_response_error"
+  )
+  expect_equal(i, 2L)
+})
+
+test_that("automatic pagination validates later and empty pages", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      items = list(),
+      next_cursor = "c1",
+      has_next_page = TRUE
+    )),
+    httr2::response_json(body = list(
+      items = list(tmt_item("tmt_2", "B")),
+      next_cursor = NA_character_,
+      has_next_page = FALSE
+    ))
+  ))
+  expect_equal(vmx_treatments(client = con)$treatment_id, "tmt_2")
+
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      items = list(tmt_item("tmt_1", "A")),
+      next_cursor = "c1",
+      has_next_page = TRUE
+    )),
+    httr2::response_json(body = list(
+      items = list(),
+      next_cursor = "c2",
+      has_next_page = FALSE
+    ))
+  ))
+  expect_error(vmx_treatments(client = con), class = "vmx_response_error")
+})
+
+test_that("single-resource responses must match the requested id", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = tmt_item("tmt_other", "Other"))
+  ))
+  expect_error(
+    vmx_treatment("tmt_1", client = con),
+    class = "vmx_response_error"
+  )
+})
+
+test_that("treatment updates preserve only contract-nullable NULL fields", {
+  captured <- new.env()
+  httr2::local_mocked_responses(function(req) {
+    captured$req <- req
+    httr2::response_json(body = tmt_item("tmt_1", "A"))
+  })
+
+  vmx_treatment_update("tmt_1", description = NULL, client = con)
+  expect_true("description" %in% names(captured$req$body$data))
+  expect_null(captured$req$body$data$description)
+
+  expect_error(
+    vmx_treatment_update("tmt_1", name = NULL, client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_treatment_update("tmt_1", unknown_field = "x", client = con),
+    class = "vmx_usage_error"
+  )
 })
 
 test_that("401 maps to vmx_auth_error", {
@@ -82,7 +196,7 @@ test_that("vmx_wait polls prep-status to a terminal state", {
   ps <- vmx_wait(structure(list(dataset_id = "ds_1"),
                            vmx_id_field = "dataset_id",
                            class = c("vmx_dataset", "vmx_resource")),
-                 interval = 0, progress = FALSE, client = con)
+                 interval = 0.001, progress = FALSE, client = con)
   expect_s3_class(ps, "vmx_prep_status")
   expect_equal(ps$status, "formatted")
   expect_equal(ps$data_version_id, "dv_1")
@@ -96,7 +210,7 @@ test_that("vmx_wait raises on a failed terminal state", {
     vmx_wait(structure(list(dataset_id = "ds_1"),
                        vmx_id_field = "dataset_id",
                        class = c("vmx_dataset", "vmx_resource")),
-             interval = 0, progress = FALSE, client = con),
+             interval = 0.001, progress = FALSE, client = con),
     class = "vmx_api_error"
   )
 })

@@ -28,7 +28,7 @@ vmx_nca_analyses(
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble, one row per analysis.
+A tibble containing all matching analyses.
 }
 \description{
 List NCA analyses

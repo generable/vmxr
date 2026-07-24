@@ -4,7 +4,14 @@
 \alias{vmx_dosing_input}
 \title{Create a dosing input for a fit}
 \usage{
-vmx_dosing_input(fit, dosing_text, scenario_name, client = vmx_client())
+vmx_dosing_input(
+  fit,
+  dosing_text,
+  scenario_name,
+  client = vmx_client(),
+  wait = FALSE,
+  ...
+)
 }
 \arguments{
 \item{fit}{A fit id (\code{mf_...}) or \code{vmx_model_fit}.}
@@ -14,6 +21,10 @@ vmx_dosing_input(fit, dosing_text, scenario_name, client = vmx_client())
 \item{scenario_name}{One or more scenario names.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{wait}{If \code{TRUE}, block until parsing succeeds or fails.}
+
+\item{...}{Polling controls forwarded to \code{\link[=vmx_wait]{vmx_wait()}}.}
 }
 \value{
 A \code{vmx_dosing_input} (carries \code{dosing_input_id}).

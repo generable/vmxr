@@ -4,7 +4,12 @@
 \alias{vmx_prep_answer}
 \title{Answer prep questions and resume formatting}
 \usage{
-vmx_prep_answer(dataset, answers, client = vmx_client())
+vmx_prep_answer(
+  dataset,
+  answers,
+  client = vmx_client(),
+  idempotency_key = NULL
+)
 }
 \arguments{
 \item{dataset}{A dataset id or \code{vmx_dataset}.}
@@ -12,6 +17,9 @@ vmx_prep_answer(dataset, answers, client = vmx_client())
 \item{answers}{A named list mapping each prompt \code{field} to its answer value.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{idempotency_key}{Optional idempotency key for safely repeating the
+submission.}
 }
 \description{
 Answer prep questions and resume formatting

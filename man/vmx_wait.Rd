@@ -19,11 +19,18 @@ vmx_wait(
 types as the API surface lands: model-build-run, simulation-job).}
 
 \item{until}{Target terminal state(s); a sensible default per type when
-\code{NULL}.}
+\code{NULL}. An explicitly requested failure state is returned; any other
+terminal failure still raises immediately.}
 
-\item{timeout}{Timeout in seconds.}
+\item{timeout}{Timeout in seconds. Resource methods use long-running defaults:
+70 minutes for prep, NCA, and dosing input; 130 minutes for simulation; and
+24 hours 10 minutes for model builds. The NCA/modeling worker defaults
+include a short persistence cushion beyond their execution ceilings; prep
+uses a client-side wait policy because its worker has no equivalent hard
+wall-clock ceiling.}
 
-\item{interval}{Poll interval in seconds (exponential backoff up to 30s).}
+\item{interval}{Positive poll interval in seconds (exponential backoff up
+to 30s).}
 
 \item{progress}{Show a progress message each poll; defaults to
 \code{\link[=interactive]{interactive()}}.}

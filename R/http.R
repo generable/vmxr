@@ -8,7 +8,7 @@
 #' Build a base request for a client
 #'
 #' Attaches the `/api/v1` prefix, bearer auth, and a user agent. HTTP error
-#' status is handled by [vmx_perform()] (not httr2's default), so the request
+#' status is handled by `vmx_perform()` (not httr2's default), so the request
 #' is configured not to raise on 4xx/5xx.
 #'
 #' @param client A `vmx_client`.
@@ -122,26 +122,53 @@ vmx_patch <- function(client, path, body = NULL) {
   vmx_perform(req)
 }
 
-#' Follow `next_cursor` pagination, returning all items as a flat list
+#' Fetch and combine every page of a cursor-paginated collection
 #'
-#' @param limit Optional cap on the total number of items returned.
+#' Cursors remain opaque: this helper only sends each server-provided
+#' `next_cursor` back to the same endpoint with the same filters. Every page is
+#' validated before its rows are combined. Repeated cursors fail loudly instead
+#' of looping forever.
+#'
+#' @param validate_page Optional callback for endpoint-specific page checks.
 #' @keywords internal
 #' @noRd
-vmx_paginate <- function(client, path, params = list(), limit = NULL) {
+vmx_paginate <- function(client, path, params = list(), validate_page = NULL) {
   query <- vmx_compact(params)
-  items <- list()
+  pages <- list()
+  metadata <- NULL
+  metadata_set <- FALSE
+  seen_cursors <- character()
+
   repeat {
-    page <- vmx_get(client, path, query)
-    items <- c(items, page$items %||% list())
-    if (!is.null(limit) && length(items) >= limit) {
-      items <- items[seq_len(limit)]
-      break
+    raw_page <- vmx_get(client, path, query)
+    if (!is.null(validate_page)) {
+      validate_page(raw_page)
     }
-    cursor <- page$next_cursor
-    if (!is.character(cursor) || length(cursor) != 1L || !nzchar(cursor)) break
+    page <- vmx_page_to_tibble(raw_page, context = path)
+    if (!metadata_set) {
+      metadata <- attr(page, "vmx_metadata", exact = TRUE)
+      metadata_set <- TRUE
+    }
+
+    cursor <- attr(page, "next_cursor", exact = TRUE)
+    attr(page, "next_cursor") <- NULL
+    attr(page, "has_next_page") <- NULL
+    attr(page, "vmx_metadata") <- NULL
+    pages[[length(pages) + 1L]] <- page
+    if (is.null(cursor)) break
+    if (cursor %in% seen_cursors) {
+      vmx_abort_response(
+        sprintf("%s returned a repeated pagination cursor.", path),
+        field = "next_cursor"
+      )
+    }
+    seen_cursors <- c(seen_cursors, cursor)
     query$cursor <- cursor
   }
-  items
+
+  out <- vctrs::vec_rbind(!!!pages)
+  attr(out, "vmx_metadata") <- metadata
+  out
 }
 
 #' Drop NULL-valued elements of a list
@@ -149,4 +176,16 @@ vmx_paginate <- function(client, path, params = list(), limit = NULL) {
 #' @noRd
 vmx_compact <- function(x) {
   x[!vapply(x, is.null, logical(1))]
+}
+
+# Validate an opaque cursor or similar non-blank scalar without interpreting it.
+vmx_id_like_scalar <- function(x, arg) {
+  if (!is.character(x) || length(x) != 1L || is.na(x) ||
+      !nzchar(trimws(x))) {
+    vmx_abort(
+      sprintf("`%s` must be one non-empty string.", arg),
+      class = "vmx_usage_error"
+    )
+  }
+  invisible(x)
 }
