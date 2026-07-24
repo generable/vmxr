@@ -130,6 +130,11 @@ vmx_patch <- function(client, path, body = NULL) {
 #' @keywords internal
 #' @noRd
 vmx_get_page <- function(client, path, params = list()) {
+  params <- vmx_validate_page_params(params)
+  vmx_page_to_tibble(vmx_get(client, path, params), context = path)
+}
+
+vmx_validate_page_params <- function(params) {
   params <- vmx_compact(params)
   if (!is.null(params$cursor)) {
     vmx_id_like_scalar(params$cursor, "cursor")
@@ -146,7 +151,7 @@ vmx_get_page <- function(client, path, params = list()) {
     }
     params$limit <- as.integer(params$limit)
   }
-  vmx_page_to_tibble(vmx_get(client, path, params), context = path)
+  params
 }
 
 #' Drop NULL-valued elements of a list
