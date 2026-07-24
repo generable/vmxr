@@ -22,6 +22,9 @@ vmx_upload <- function(study, files,
                        client = vmx_client(), ...) {
   mode <- match.arg(mode)
   files <- vmx_nonempty_strings(files, "files", unique = TRUE)
+  if (!is.null(config)) {
+    config <- vmx_nonempty_strings(config, "config", exactly_one = TRUE)
+  }
   std_id <- vmx_id(study, "std", arg = "study")
   tmt_id <- if (!is.null(treatment)) {
     vmx_id(treatment, "tmt", arg = "treatment")
@@ -29,10 +32,20 @@ vmx_upload <- function(study, files,
     vmx_study_treatment_id(study, client)
   }
 
-  missing <- files[!file.exists(files)]
-  if (length(missing)) {
+  invalid_files <- files[
+    !file.exists(files) |
+      vapply(
+        files,
+        function(path) isTRUE(file.info(path)$isdir),
+        logical(1)
+      )
+  ]
+  if (length(invalid_files)) {
     vmx_abort(
-      sprintf("File(s) not found: %s", paste(missing, collapse = ", ")),
+      sprintf(
+        "Upload path(s) must be existing files: %s",
+        paste(invalid_files, collapse = ", ")
+      ),
       class = "vmx_usage_error"
     )
   }
@@ -150,7 +163,21 @@ vmx_dataset_tags <- function(dataset, client = vmx_client()) {
   if (is.null(tags) || !length(tags)) {
     return(tibble::tibble(key = character(0), value = character(0)))
   }
-  tibble::tibble(key = names(tags), value = vmx_chr(unname(tags)))
+  if (!is.list(tags) || is.null(names(tags)) ||
+      any(!nzchar(names(tags))) || anyDuplicated(names(tags))) {
+    vmx_abort_response(
+      "field 'dataset.tags' must be an object.",
+      field = "tags"
+    )
+  }
+  values <- vapply(seq_along(tags), function(i) {
+    vmx_response_scalar(
+      tags[[i]],
+      paste0("dataset.tags.", names(tags)[[i]]),
+      type = "character"
+    )
+  }, character(1))
+  tibble::tibble(key = names(tags), value = values)
 }
 
 #' Cancel a dataset's in-flight format job

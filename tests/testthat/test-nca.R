@@ -173,3 +173,31 @@ test_that("vmx_nca_result rejects misaligned point-estimate arrays", {
     class = "vmx_response_error"
   )
 })
+
+test_that("vmx_nca_result protects subject-identity columns", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      nca_id = "nca_1",
+      data_version_id = "dv_1",
+      status = "completed",
+      time_basis = "observed",
+      subject_id = list("S1"),
+      gen_subject_uuid = list(
+        "11111111-1111-4111-8111-111111111111"
+      ),
+      point_estimates = list(subject_id = list(10)),
+      quantities = list(),
+      excluded_subjects = list(),
+      units = list(),
+      trigger_source = list(
+        type = "system",
+        system_component = "event_router",
+        reason = "data_version_eligible"
+      )
+    ))
+  ))
+  expect_error(
+    vmx_nca_result("nca_1", client = con),
+    class = "vmx_response_error"
+  )
+})

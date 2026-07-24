@@ -120,6 +120,15 @@ vmx_nca_result <- function(nca, client = vmx_client()) {
       field = "point_estimates"
     )
   }
+  reserved <- intersect(
+    names(estimates), c("subject_id", "gen_subject_uuid")
+  )
+  if (length(reserved)) {
+    vmx_abort_response(
+      "NCA metric name conflicts with a subject-identity column.",
+      field = paste0("point_estimates.", reserved[[1]])
+    )
+  }
   cols <- list(
     subject_id = subject_id,
     gen_subject_uuid = gen_subject_uuid
@@ -147,12 +156,4 @@ vmx_nca_result <- function(nca, client = vmx_client()) {
     if (name %in% names(res)) attr(out, name) <- res[[name]]
   }
   out
-}
-
-# Coerce a parsed JSON array (list of scalars, possibly with JSON nulls) to a
-# vector. A null parses to NULL or an empty list depending on the encoder, so
-# treat any length-0 element as a missing value.
-vmx_chr <- function(x) {
-  if (!length(x)) return(character(0))
-  vapply(x, function(v) if (length(v) == 0) NA_character_ else as.character(v[[1]]), character(1))
 }
