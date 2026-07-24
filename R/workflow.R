@@ -43,14 +43,7 @@ vmx_analysis_log <- function(study, kind = NULL, event_type = NULL,
     limit = limit
   )
   path <- paste0("/studies/", study_id, "/analysis-log")
-  params <- vmx_compact(params)
-  if (!is.null(params$cursor)) {
-    vmx_id_like_scalar(params$cursor, "cursor")
-  }
-  if (!is.null(params$limit)) {
-    # Reuse the generic validation without issuing a second request.
-    vmx_get_page_params(params)
-  }
+  params <- vmx_validate_page_params(params)
   page <- vmx_get(client, path, params)
   vmx_validate_response_id(
     page, "study_id", study_id, "analysis log"

@@ -208,10 +208,12 @@ test_that("sim create with wait=TRUE forwards polling controls", {
 
 test_that("vmx_sim_result preserves server-provided trajectory semantics", {
   env <- capture_one(list(
+    schema_version = "vmm.simulation_summary.v1",
     simulation_version_id = "sv_1",
     model_fit_id = "mf_1",
     model_type = "pk",
     time_basis = "observed",
+    simulation_kind = "population",
     simulation_description = paste(
       "Estimate value and server-provided interval of simulated population-level",
       "concentration and quantities grouped over simulated subjects."
@@ -265,6 +267,22 @@ test_that("vmx_sim_result rejects an ambiguous grouping variable", {
       "simjob_1", grouping_variable = c("arm", "dose_group"), client = con
     ),
     class = "vmx_usage_error"
+  )
+})
+
+test_that("vmx_sim_result rejects a malformed success payload", {
+  env <- capture_one(list(
+    schema_version = "vmm.simulation_summary.v1",
+    simulation_version_id = "sv_1",
+    model_fit_id = "mf_1",
+    model_type = "pk",
+    time_basis = "observed",
+    simulation_kind = "population",
+    quantities = list()
+  ))
+  expect_error(
+    vmx_sim_result("simjob_1", client = con),
+    class = "vmx_response_error"
   )
 })
 

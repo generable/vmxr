@@ -20,6 +20,7 @@ test_that("vmx_analysis_log paginates and forwards filters", {
   expect_match(env$req$url, "/studies/std_1/analysis-log")
   expect_match(env$req$url, "kind=event")
   expect_match(env$req$url, "since=2026-01-01")   # POSIXct -> ISO-8601
+  expect_equal(attr(tbl, "vmx_metadata")$study_id, "std_1")
 })
 
 test_that("vmx_analysis_log accepts a resource object", {
@@ -27,6 +28,7 @@ test_that("vmx_analysis_log accepts a resource object", {
   httr2::local_mocked_responses(function(req) {
     env$req <- req
     httr2::response_json(body = list(
+      study_id = "std_1",
       items = list(),
       next_cursor = NA_character_,
       has_next_page = FALSE
