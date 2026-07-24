@@ -26,6 +26,21 @@ test_that("vmx_model_catalog flattens categories into a tibble", {
   expect_true("display_name" %in% names(tbl))
 })
 
+test_that("model catalog helpers reject malformed inputs and responses", {
+  expect_error(
+    vmx_model_describe(c("one_cmt", "two_cmt"), client = con),
+    class = "vmx_usage_error"
+  )
+
+  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+    pk = list(name = "not-an-array")
+  ))))
+  expect_error(
+    vmx_model_catalog(client = con),
+    class = "vmx_response_error"
+  )
+})
+
 test_that("vmx_model_build parses pd_marker shorthand and posts the body", {
   env <- capture_one(run_item("run_9"))
   run <- vmx_model_build("dv_1", "observed",
@@ -60,6 +75,12 @@ test_that("PK-only modeling options and builds send an explicit empty marker sel
 test_that("vmx_model_build rejects malformed pd_marker", {
   expect_error(
     vmx_model_build("dv_1", "observed", pd_marker = "GEN_abc:sideways", client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_model_build(
+      "dv_1", "observed", covariate = c("WT", "WT"), client = con
+    ),
     class = "vmx_usage_error"
   )
 })
@@ -227,6 +248,31 @@ test_that("global estimates fail loudly when scalar values arrive as arrays", {
         kind = "credible", level = 0.95, lower = 0.5, upper = 0.9
       ),
       kind = "structural", model_type = "pk"
+    ))
+  ))))
+  expect_error(
+    vmx_fit_global_estimates("mf_1", client = con),
+    class = "vmx_response_error"
+  )
+})
+
+test_that("tagged estimates reject an unknown model type", {
+  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+    model_fit_id = "mf_1",
+    estimates = list(list(
+      kind = "structural",
+      name = "CL",
+      display_name = "Clearance",
+      model_type = "unknown",
+      unit = "L/h",
+      value_statistic = "median",
+      value = 1,
+      interval = list(
+        kind = "credible",
+        level = 0.95,
+        lower = 0.5,
+        upper = 1.5
+      )
     ))
   ))))
   expect_error(

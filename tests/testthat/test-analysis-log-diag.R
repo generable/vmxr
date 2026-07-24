@@ -37,6 +37,17 @@ test_that("vmx_analysis_log accepts a resource object", {
   expect_match(env$req$url, "resource_id=dv_9")
 })
 
+test_that("vmx_analysis_log rejects an ambiguous since vector", {
+  expect_error(
+    vmx_analysis_log(
+      "std_1",
+      since = c("2026-01-01T00:00:00Z", "2026-02-01T00:00:00Z"),
+      client = con
+    ),
+    class = "vmx_usage_error"
+  )
+})
+
 test_that("vmx_fit_obs_vs_pred reshapes current Estimate envelopes", {
   httr2::local_mocked_responses(list(httr2::response_json(body = list(
     model_fit_id = "mf_1",

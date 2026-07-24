@@ -22,10 +22,12 @@ types as the API surface lands: model-build-run, simulation-job).}
 \code{NULL}. An explicitly requested failure state is returned; any other
 terminal failure still raises immediately.}
 
-\item{timeout}{Timeout in seconds. Resource methods default to their worker
-execution ceiling plus a short persistence cushion (70 minutes for
-prep/NCA/dosing input, 130 minutes for simulation, and 24 hours 10 minutes
-for model builds).}
+\item{timeout}{Timeout in seconds. Resource methods use long-running defaults:
+70 minutes for prep, NCA, and dosing input; 130 minutes for simulation; and
+24 hours 10 minutes for model builds. The NCA/modeling worker defaults
+include a short persistence cushion beyond their execution ceilings; prep
+uses a client-side wait policy because its worker has no equivalent hard
+wall-clock ceiling.}
 
 \item{interval}{Positive poll interval in seconds (exponential backoff up
 to 30s).}

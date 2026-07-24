@@ -28,6 +28,7 @@ vmx_analysis_log <- function(study, kind = NULL, event_type = NULL,
                              client = vmx_client(), event_code = NULL,
                              requires_staff_review = NULL, cursor = NULL,
                              limit = NULL) {
+  study_id <- vmx_id(study, "std")
   resource_id <- if (inherits(resource, "vmx_resource")) vmx_resource_id(resource) else resource
   params <- list(
     kind = kind,
@@ -41,20 +42,31 @@ vmx_analysis_log <- function(study, kind = NULL, event_type = NULL,
     cursor = cursor,
     limit = limit
   )
-  vmx_get_page(
-    client,
-    paste0("/studies/", vmx_id(study, "std"), "/analysis-log"),
-    params
+  path <- paste0("/studies/", study_id, "/analysis-log")
+  params <- vmx_compact(params)
+  if (!is.null(params$cursor)) {
+    vmx_id_like_scalar(params$cursor, "cursor")
+  }
+  if (!is.null(params$limit)) {
+    # Reuse the generic validation without issuing a second request.
+    vmx_get_page_params(params)
+  }
+  page <- vmx_get(client, path, params)
+  vmx_validate_response_id(
+    page, "study_id", study_id, "analysis log"
   )
+  vmx_page_to_tibble(page, context = path)
 }
 
 # Format a time filter to ISO-8601 UTC; pass character through unchanged.
-vmx_format_time <- function(x) {
+vmx_format_time <- function(x, arg = "since") {
   if (is.null(x)) return(NULL)
   if (inherits(x, c("POSIXct", "POSIXt", "Date"))) {
     if (length(x) != 1L || is.na(x)) {
-      vmx_abort("`since` must be one non-missing date-time.",
-                class = "vmx_usage_error")
+      vmx_abort(
+        sprintf("`%s` must be one non-missing date-time.", arg),
+        class = "vmx_usage_error"
+      )
     }
     return(format(
       as.POSIXct(x, tz = "UTC"),
@@ -64,8 +76,13 @@ vmx_format_time <- function(x) {
   }
   if (!is.character(x) || length(x) != 1L || is.na(x) ||
       !nzchar(trimws(x))) {
-    vmx_abort("`since` must be one non-empty ISO-8601 string or date-time.",
-              class = "vmx_usage_error")
+    vmx_abort(
+      sprintf(
+        "`%s` must be one non-empty ISO-8601 string or date-time.",
+        arg
+      ),
+      class = "vmx_usage_error"
+    )
   }
   x
 }

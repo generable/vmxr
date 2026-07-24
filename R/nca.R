@@ -47,14 +47,23 @@ vmx_nca_analyses <- function(data_version = NULL, study = NULL, treatment = NULL
 vmx_nca <- function(data_version, time_basis, idempotency_key = NULL,
                     retried_from = NULL, wait = TRUE, ...,
                     client = vmx_client()) {
+  time_basis <- vmx_nonempty_strings(
+    time_basis, "time_basis", exactly_one = TRUE
+  )
+  if (!is.null(idempotency_key)) {
+    vmx_id_like_scalar(idempotency_key, "idempotency_key")
+  }
   body <- vmx_compact(list(
     data_version_id = vmx_id(data_version, "dv", "data_version"),
     time_basis = time_basis,
     idempotency_key = idempotency_key,
-    retried_from = retried_from
+    retried_from = vmx_opt_id(retried_from, "nca", "retried_from")
   ))
-  nca <- new_vmx_resource(vmx_post(client, "/nca-analyses", body),
-                          "vmx_nca_analysis", "nca_id")
+  data <- vmx_post(client, "/nca-analyses", body)
+  vmx_validate_response_id(
+    data, "data_version_id", body$data_version_id, "NCA creation"
+  )
+  nca <- new_vmx_resource(data, "vmx_nca_analysis", "nca_id")
   if (isTRUE(wait)) vmx_wait(nca, client = client, ...) else nca
 }
 
@@ -146,8 +155,4 @@ vmx_nca_result <- function(nca, client = vmx_client()) {
 vmx_chr <- function(x) {
   if (!length(x)) return(character(0))
   vapply(x, function(v) if (length(v) == 0) NA_character_ else as.character(v[[1]]), character(1))
-}
-vmx_num <- function(x) {
-  if (!length(x)) return(numeric(0))
-  vapply(x, function(v) if (length(v) == 0) NA_real_ else as.numeric(v[[1]]), numeric(1))
 }

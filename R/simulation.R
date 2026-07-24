@@ -15,7 +15,9 @@
 vmx_dosing_input <- function(fit, dosing_text, scenario_name,
                              client = vmx_client(), wait = FALSE, ...) {
   dosing_text <- vmx_nonempty_strings(dosing_text, "dosing_text", exactly_one = TRUE)
-  scenario_name <- vmx_nonempty_strings(scenario_name, "scenario_name")
+  scenario_name <- vmx_nonempty_strings(
+    scenario_name, "scenario_name", unique = TRUE
+  )
   body <- list(dosing_text = dosing_text, scenario_names = as.list(scenario_name))
   data <- vmx_post(client, paste0("/model-fits/", vmx_id(fit, "mf", "fit"),
                                   "/simulation-dosing-inputs"), body)
@@ -233,8 +235,19 @@ vmx_sim_status <- function(job, client = vmx_client()) {
 #' @return A list (the parsed result).
 #' @export
 vmx_sim_result <- function(job, grouping_variable = NULL, client = vmx_client()) {
-  vmx_get(client, paste0("/simulation-jobs/", vmx_id(job, "simjob", "job"), "/result"),
-          list(grouping_variable = grouping_variable))
+  job_id <- vmx_id(job, "simjob", "job")
+  if (!is.null(grouping_variable)) {
+    grouping_variable <- vmx_nonempty_strings(
+      grouping_variable, "grouping_variable", exactly_one = TRUE
+    )
+  }
+  out <- vmx_get(
+    client,
+    paste0("/simulation-jobs/", job_id, "/result"),
+    list(grouping_variable = grouping_variable)
+  )
+  vmx_validate_sim_result(out, job, grouping_variable)
+  out
 }
 
 #' Cancel a simulation job
@@ -252,7 +265,24 @@ vmx_sim_cancel <- function(job, client = vmx_client()) {
 # -- internals ---------------------------------------------------------------
 
 vmx_create_sim_job <- function(fit, endpoint, body, wait, client, ...) {
-  data <- vmx_post(client, paste0("/model-fits/", vmx_id(fit, "mf", "fit"), "/", endpoint), body)
+  fit_id <- vmx_id(fit, "mf", "fit")
+  if ("min_timepoints" %in% names(body)) {
+    body$min_timepoints <- vmx_sim_min_timepoints(body$min_timepoints)
+  }
+  if ("idempotency_key" %in% names(body)) {
+    vmx_id_like_scalar(body$idempotency_key, "idempotency_key")
+  }
+  if ("retried_from" %in% names(body)) {
+    body$retried_from <- vmx_id(
+      body$retried_from, "simjob", "retried_from"
+    )
+  }
+  data <- vmx_post(
+    client, paste0("/model-fits/", fit_id, "/", endpoint), body
+  )
+  vmx_validate_response_id(
+    data, "model_fit_id", fit_id, "simulation creation"
+  )
   job <- new_vmx_resource(data, "vmx_simulation_job", "simulation_job_id")
   if (isTRUE(wait)) vmx_wait(job, client = client, ...) else job
 }
@@ -377,16 +407,6 @@ vmx_hypothetical_records <- function(x) {
   })
 }
 
-vmx_nonempty_strings <- function(x, arg, exactly_one = FALSE) {
-  if (is.factor(x)) x <- as.character(x)
-  if (!is.character(x) || !length(x) || anyNA(x) ||
-      any(!nzchar(trimws(x))) || (isTRUE(exactly_one) && length(x) != 1L)) {
-    count <- if (isTRUE(exactly_one)) "one non-empty string" else "one or more non-empty strings"
-    vmx_abort(sprintf("`%s` must be %s.", arg, count), class = "vmx_usage_error")
-  }
-  as.character(x)
-}
-
 vmx_subject_string <- function(x, arg) {
   if (is.factor(x)) x <- as.character(x)
   vmx_nonempty_strings(x, arg, exactly_one = TRUE)
@@ -404,4 +424,105 @@ vmx_covariate_value <- function(x, arg) {
     )
   }
   x
+}
+
+vmx_sim_min_timepoints <- function(x) {
+  if (!is.numeric(x) || length(x) != 1L || is.na(x) ||
+      !is.finite(x) || x != floor(x) || x < 10L || x > 600L) {
+    vmx_abort(
+      "`min_timepoints` must be one integer between 10 and 600.",
+      class = "vmx_usage_error"
+    )
+  }
+  as.integer(x)
+}
+
+vmx_validate_sim_result <- function(x, job, grouping_variable) {
+  if (!is.list(x) || is.null(names(x)) || anyDuplicated(names(x))) {
+    vmx_abort_response(
+      "simulation result must be an object.",
+      field = "simulation_result"
+    )
+  }
+  for (field in c(
+    "schema_version", "simulation_version_id", "model_fit_id", "model_type",
+    "time_basis", "simulation_kind"
+  )) {
+    value <- vmx_response_scalar(
+      vmx_response_field(x, field, paste0("simulation result.", field)),
+      paste0("simulation result.", field),
+      type = "character",
+      nonempty = TRUE
+    )
+    if (field == "simulation_version_id") {
+      vmx_id(value, "sv", field)
+    } else if (field == "model_fit_id") {
+      vmx_id(value, "mf", field)
+    }
+  }
+  if (!x$model_type %in% c("pk", "pd")) {
+    vmx_abort_response(
+      "field 'simulation result.model_type' must be 'pk' or 'pd'.",
+      field = "model_type"
+    )
+  }
+  if (!x$simulation_kind %in%
+      c("existing_subject", "hypothetical_subject", "population")) {
+    vmx_abort_response(
+      "field 'simulation result.simulation_kind' is unknown.",
+      field = "simulation_kind"
+    )
+  }
+  series <- vmx_response_field(x, "series", "simulation result.series")
+  quantities <- vmx_response_field(
+    x, "quantities", "simulation result.quantities"
+  )
+  if (!is.list(series) || !is.null(names(series))) {
+    vmx_abort_response(
+      "field 'simulation result.series' must be an array.",
+      field = "series"
+    )
+  }
+  if (!is.list(quantities) ||
+      (length(quantities) && is.null(names(quantities))) ||
+      anyDuplicated(names(quantities))) {
+    vmx_abort_response(
+      "field 'simulation result.quantities' must be an object.",
+      field = "quantities"
+    )
+  }
+  for (i in seq_along(series)) {
+    if (!is.list(series[[i]]) || is.null(names(series[[i]])) ||
+        anyDuplicated(names(series[[i]]))) {
+      vmx_abort_response(
+        "each simulation result series entry must be an object.",
+        field = "series"
+      )
+    }
+  }
+  if (inherits(job, "vmx_resource") && !is.null(job[["model_fit_id"]])) {
+    vmx_validate_response_id(
+      x,
+      "model_fit_id",
+      vmx_id(job[["model_fit_id"]], "mf", "job$model_fit_id"),
+      "simulation result"
+    )
+  }
+  if (!is.null(grouping_variable)) {
+    returned_grouping <- vmx_response_scalar(
+      vmx_response_field(
+        x, "grouping_variable", "simulation result.grouping_variable"
+      ),
+      "simulation result.grouping_variable",
+      type = "character",
+      nonempty = TRUE
+    )
+    if (!identical(returned_grouping, grouping_variable)) {
+      vmx_abort_response(
+        "simulation result grouping does not match the requested grouping.",
+        field = "grouping_variable"
+      )
+    }
+  }
+  invisible(x)
 }

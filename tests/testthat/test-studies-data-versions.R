@@ -61,6 +61,26 @@ test_that("vmx_studies returns one filtered page and accepts its cursor", {
   expect_match(cm$captured$req$url, "cursor=c1")
 })
 
+test_that("vmx_studies forwards a validated created_since filter", {
+  cm <- capturing_mock(list(
+    items = list(),
+    next_cursor = NA_character_,
+    has_next_page = FALSE
+  ))
+  httr2::local_mocked_responses(cm$mock)
+
+  vmx_studies(
+    created_since = as.POSIXct("2026-01-02 03:04:05", tz = "UTC"),
+    client = con
+  )
+
+  expect_match(
+    utils::URLdecode(cm$captured$req$url),
+    "created_since=2026-01-02T03:04:05Z",
+    fixed = TRUE
+  )
+})
+
 test_that("collection flattening keeps nested arrays in one row", {
   markers <- list(
     list(name = "effect", type = "continuous"),
@@ -173,6 +193,46 @@ test_that("vmx_data_version_create posts upload_ids and returns a prep-status", 
   expect_s3_class(ps, "vmx_prep_status")
   expect_equal(cm$captured$req$body$data$upload_ids, list("upl_a", "upl_b"))
   expect_match(cm$captured$req$url, "/datasets/ds_1/data-versions$")
+})
+
+test_that("vmx_data_version_create validates its upload composition", {
+  expect_error(
+    vmx_data_version_create("ds_1", uploads = character(), client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_data_version_create("ds_1", uploads = "ds_wrong", client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_data_version_create(
+      "ds_1", uploads = c("upl_a", "upl_a"), client = con
+    ),
+    class = "vmx_usage_error"
+  )
+})
+
+test_that("vmx_data_version_export requires the canonical matching envelope", {
+  cm <- capturing_mock(list(
+    data_version_id = "dv_1",
+    download_url = "https://storage.test/signed",
+    expires_at = "2026-01-01T01:00:00Z",
+    byte_size = 10,
+    files = list()
+  ))
+  httr2::local_mocked_responses(cm$mock)
+  out <- vmx_data_version_export("dv_1", client = con)
+  expect_equal(out$download_url, "https://storage.test/signed")
+
+  cm2 <- capturing_mock(list(
+    data_version_id = "dv_other",
+    download_url = "https://storage.test/signed"
+  ))
+  httr2::local_mocked_responses(cm2$mock)
+  expect_error(
+    vmx_data_version_export("dv_1", client = con),
+    class = "vmx_response_error"
+  )
 })
 
 test_that("archive/unarchive PATCH the right body", {

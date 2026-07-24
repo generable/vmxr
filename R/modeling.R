@@ -12,9 +12,31 @@
 vmx_model_catalog <- function(data_version = NULL, client = vmx_client()) {
   catalog <- vmx_get(client, "/model-catalog",
                      list(data_version_id = vmx_opt_id(data_version, "dv", "data_version")))
+  if (!is.list(catalog) ||
+      (length(catalog) &&
+        (is.null(names(catalog)) || any(!nzchar(names(catalog))) ||
+          anyDuplicated(names(catalog))))) {
+    vmx_abort_response(
+      "model catalog must be an object keyed by category.",
+      field = "model_catalog"
+    )
+  }
   rows <- list()
   for (category in names(catalog)) {
-    for (model in catalog[[category]]) {
+    models <- catalog[[category]]
+    if (!is.list(models) || !is.null(names(models))) {
+      vmx_abort_response(
+        "each model catalog category must contain an array of models.",
+        field = category
+      )
+    }
+    for (model in models) {
+      if (is.list(model) && "category" %in% names(model)) {
+        vmx_abort_response(
+          "model catalog entry conflicts with the client category column.",
+          field = "category"
+        )
+      }
       row <- vmx_flatten_row(model)
       row$category <- category
       rows[[length(rows) + 1L]] <- row
@@ -30,8 +52,28 @@ vmx_model_catalog <- function(data_version = NULL, client = vmx_client()) {
 #' @return A named list.
 #' @export
 vmx_model_describe <- function(model_name, client = vmx_client()) {
-  vmx_post(client, "/model-catalog/model-description",
-           list(model_catalog_name = model_name))
+  model_name <- vmx_nonempty_strings(
+    model_name, "model_name", exactly_one = TRUE
+  )
+  out <- vmx_post(
+    client, "/model-catalog/model-description",
+    list(model_catalog_name = model_name)
+  )
+  if (!is.list(out) || is.null(names(out)) || any(!nzchar(names(out))) ||
+      anyDuplicated(names(out))) {
+    vmx_abort_response(
+      "model description must be an object of text fields.",
+      field = "model_description"
+    )
+  }
+  for (field in names(out)) {
+    vmx_response_scalar(
+      out[[field]],
+      paste0("model description.", field),
+      type = "character"
+    )
+  }
+  out
 }
 
 #' Preview modeling options for a data version
@@ -45,10 +87,19 @@ vmx_model_describe <- function(model_name, client = vmx_client()) {
 #' @export
 vmx_modeling_options <- function(data_version, time_basis, pd_marker = NULL,
                                  covariate = NULL, client = vmx_client()) {
+  time_basis <- vmx_nonempty_strings(
+    time_basis, "time_basis", exactly_one = TRUE
+  )
   markers <- pd_marker %||% character(0)
-  if (!is.character(markers) || anyNA(markers) || any(!nzchar(markers))) {
+  if (!is.character(markers) || anyNA(markers) ||
+      any(!nzchar(trimws(markers))) || anyDuplicated(markers)) {
     vmx_abort("`pd_marker` must contain non-empty marker UUID strings.",
               class = "vmx_usage_error")
+  }
+  covariates <- if (is.null(covariate)) {
+    NULL
+  } else {
+    vmx_nonempty_strings(covariate, "covariate", unique = TRUE)
   }
   body <- list(
     data_version_id = vmx_id(data_version, "dv", "data_version"),
@@ -57,8 +108,12 @@ vmx_modeling_options <- function(data_version, time_basis, pd_marker = NULL,
     # the default preflight matches vmx_model_build()'s PK-only default.
     pd_markers = as.list(markers)
   )
-  if (!is.null(covariate)) body$covariates <- as.list(covariate)
-  vmx_post(client, "/modeling-options", body)
+  if (!is.null(covariates)) body$covariates <- as.list(covariates)
+  out <- vmx_post(client, "/modeling-options", body)
+  vmx_validate_response_id(
+    out, "data_version_id", body$data_version_id, "modeling options"
+  )
+  out
 }
 
 #' Start a model build run (optionally wait)
@@ -83,25 +138,43 @@ vmx_model_build <- function(data_version, time_basis, pd_marker = NULL,
                             covariate = NULL, idempotency_key = NULL,
                             retried_from = NULL, wait = FALSE, ...,
                             client = vmx_client()) {
+  time_basis <- vmx_nonempty_strings(
+    time_basis, "time_basis", exactly_one = TRUE
+  )
+  covariates <- if (is.null(covariate)) {
+    character(0)
+  } else {
+    vmx_nonempty_strings(covariate, "covariate", unique = TRUE)
+  }
   body <- list(
     data_version_id = vmx_id(data_version, "dv", "data_version"),
     time_basis = time_basis,
-    covariates = if (is.null(covariate)) list() else as.list(covariate)
+    covariates = as.list(covariates)
   )
   pdm <- vmx_pd_markers(pd_marker)
   body$pd_markers <- pdm
-  if (!is.null(idempotency_key)) body$idempotency_key <- idempotency_key
-  if (!is.null(retried_from)) body$retried_from <- retried_from
+  if (!is.null(idempotency_key)) {
+    vmx_id_like_scalar(idempotency_key, "idempotency_key")
+    body$idempotency_key <- idempotency_key
+  }
+  if (!is.null(retried_from)) {
+    body$retried_from <- vmx_id(retried_from, "run", "retried_from")
+  }
 
-  run <- new_vmx_resource(vmx_post(client, "/model-build-runs", body),
-                          "vmx_model_build_run", "run_id")
+  data <- vmx_post(client, "/model-build-runs", body)
+  vmx_validate_response_id(
+    data, "data_version_id", body$data_version_id, "model-build creation"
+  )
+  run <- new_vmx_resource(
+    data, "vmx_model_build_run", "run_id"
+  )
   if (isTRUE(wait)) vmx_wait(run, client = client, ...) else run
 }
 
 # Parse "GEN_uuid:direction" shorthand into the API's marker objects.
 vmx_pd_markers <- function(x) {
   if (is.null(x)) return(list())
-  if (!is.character(x) || anyNA(x)) {
+  if (!is.character(x) || anyNA(x) || any(!nzchar(trimws(x)))) {
     vmx_abort("`pd_marker` must be a character vector.", class = "vmx_usage_error")
   }
   out <- lapply(x, function(s) {

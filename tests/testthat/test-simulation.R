@@ -126,6 +126,29 @@ test_that("vmx_sim_population posts scenario_name", {
   expect_match(env$req$url, "/population-simulation-jobs$")
 })
 
+test_that("simulation creation validates bounded controls and retry ids", {
+  expect_error(
+    vmx_sim_population(
+      "mf_1", "simdose_1", "high-dose",
+      min_timepoints = 9, client = con
+    ),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_sim_population(
+      "mf_1", "simdose_1", "high-dose",
+      retried_from = "run_wrong", client = con
+    ),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_dosing_input(
+      "mf_1", "100 mg qd", c("same", "same"), client = con
+    ),
+    class = "vmx_usage_error"
+  )
+})
+
 test_that("vmx_sim_population_from_text posts dosing text", {
   env <- capture_one(job_item("simjob_9"))
   vmx_sim_population_from_text("mf_1", "100 mg qd", "high-dose", client = con)
@@ -234,6 +257,15 @@ test_that("vmx_sim_result preserves server-provided trajectory semantics", {
   expect_equal(estimate$interval$kind, "confidence")
   expect_equal(estimate$interval$level, 0.8)
   expect_match(env$req$url, "grouping_variable=dose_group")
+})
+
+test_that("vmx_sim_result rejects an ambiguous grouping variable", {
+  expect_error(
+    vmx_sim_result(
+      "simjob_1", grouping_variable = c("arm", "dose_group"), client = con
+    ),
+    class = "vmx_usage_error"
+  )
 })
 
 test_that("simulation rejects legacy dosing-input ids", {
