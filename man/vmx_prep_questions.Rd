@@ -12,7 +12,8 @@ vmx_prep_questions(dataset, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble of pending questions.
+A tibble of pending questions. Variable-shape values such as
+\code{options}, \code{default}, and \code{data_preview} are retained as list-columns.
 }
 \description{
 Questions raised by prep (when awaiting input)

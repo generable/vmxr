@@ -4,16 +4,19 @@
 #' @param treatment A treatment id (`tmt_...`) or `vmx_treatment`; `NULL` lists
 #'   across all treatments.
 #' @param status Optional status filter.
+#' @param created_since Optional lower creation-time bound: a
+#'   `POSIXct`/`Date` or ISO-8601 string.
 #' @param cursor Opaque cursor returned by [vmx_next_cursor()].
 #' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
 #' @return One server-owned page as a tibble.
 #' @export
 vmx_studies <- function(treatment = NULL, status = NULL, client = vmx_client(),
-                        cursor = NULL, limit = NULL) {
+                        cursor = NULL, limit = NULL, created_since = NULL) {
   params <- list(
     treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
     status = status,
+    created_since = vmx_format_time(created_since, arg = "created_since"),
     cursor = cursor,
     limit = limit
   )
@@ -44,16 +47,46 @@ vmx_study <- function(id, client = vmx_client()) {
 #' @export
 vmx_study_create <- function(treatment, name, study_type = "clinical",
                              phase = NULL, ..., client = vmx_client()) {
+  treatment_id <- vmx_id(treatment, "tmt", "treatment")
+  name <- vmx_nonempty_strings(name, "name", exactly_one = TRUE)
+  if (!is.null(study_type)) {
+    study_type <- vmx_nonempty_strings(
+      study_type, "study_type", exactly_one = TRUE
+    )
+  }
+  if (!is.null(phase)) {
+    phase <- vmx_nonempty_strings(phase, "phase", exactly_one = TRUE)
+  }
+  extra <- list(...)
+  if (length(extra)) {
+    vmx_validate_update_body(
+      extra,
+      allowed = c("description", "route_of_administration", "pd_markers"),
+      nullable = c("description", "route_of_administration"),
+      resource = "study creation"
+    )
+  }
+  if ("pd_markers" %in% names(extra) &&
+      (!is.list(extra$pd_markers) || !is.null(names(extra$pd_markers)))) {
+    vmx_abort(
+      "`pd_markers` must be an array of marker objects.",
+      class = "vmx_usage_error"
+    )
+  }
   body <- vmx_compact(c(
     list(
-      treatment_id = vmx_id(treatment, "tmt", "treatment"),
+      treatment_id = treatment_id,
       name = name,
       study_type = study_type,
       phase = phase
     ),
-    list(...)
+    extra
   ))
-  new_vmx_resource(vmx_post(client, "/studies", body), "vmx_study", "study_id")
+  data <- vmx_post(client, "/studies", body)
+  vmx_validate_response_id(
+    data, "treatment_id", treatment_id, "study creation"
+  )
+  new_vmx_resource(data, "vmx_study", "study_id")
 }
 
 #' Update a study

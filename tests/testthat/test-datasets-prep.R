@@ -46,7 +46,12 @@ test_that("vmx_upload sends config_yaml as inline form text", {
   writeLines("time,conc\n0,1", data_file)
   writeLines(c("version: 2", "datasets: []"), config_file)
 
-  env <- capture_one(list(dataset_id = "ds_1", status = "uploaded"))
+  env <- capture_one(list(
+    dataset_id = "ds_1",
+    treatment_id = "tmt_1",
+    study_id = "std_1",
+    status = "uploaded"
+  ))
   study <- new_vmx_resource(
     list(study_id = "std_1", treatment_id = "tmt_1"),
     "vmx_study",
@@ -58,6 +63,20 @@ test_that("vmx_upload sends config_yaml as inline form text", {
   expect_equal(body$study_id, "std_1")
   expect_equal(body$treatment_id, "tmt_1")
   expect_equal(body$config_yaml, "version: 2\ndatasets: []")
+})
+
+test_that("vmx_upload rejects empty or duplicate file selections", {
+  expect_error(
+    vmx_upload("std_1", character(), treatment = "tmt_1", client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_upload(
+      "std_1", c("same.csv", "same.csv"),
+      treatment = "tmt_1", client = con
+    ),
+    class = "vmx_usage_error"
+  )
 })
 
 test_that("vmx_dataset fetches and types the resource", {
@@ -120,13 +139,22 @@ test_that("vmx_prep_questions builds a tibble from the prompt", {
     dataset_id = "ds_1", status = "awaiting_input",
     prompt = list(message = "Need info", fields = list(
       list(field = "dose_unit", question = "Units?", required = TRUE,
-           options = list("mg", "ug"), format = "enum")
+           options = list("mg", "ug"), format = "enum",
+           referent = "dosing:unit", rationale = "Needed for conversion.",
+           data_preview = list(list(value = 100)),
+           resolution = list(kind = "unit", hint = "Choose the source unit."),
+           default = "mg", group = "dosing")
     ))
   ))))
   q <- vmx_prep_questions("ds_1", client = con)
   expect_equal(q$field, "dose_unit")
   expect_true(q$required)
   expect_equal(q$options[[1]], list("mg", "ug"))
+  expect_equal(q$referent, "dosing:unit")
+  expect_equal(q$resolution_kind, "unit")
+  expect_equal(q$resolution_hint, "Choose the source unit.")
+  expect_equal(q$default[[1]], "mg")
+  expect_equal(q$data_preview[[1]], list(list(value = 100)))
 })
 
 test_that("vmx_prep_questions is empty when no prompt", {
@@ -138,12 +166,46 @@ test_that("vmx_prep_questions is empty when no prompt", {
 
 test_that("vmx_prep_answer posts the answers body", {
   env <- capture_one(list(dataset_id = "ds_1", status = "formatting"))
-  ps <- vmx_prep_answer("ds_1", list(dose_unit = "mg"), client = con)
+  ps <- vmx_prep_answer(
+    "ds_1",
+    list(dose_unit = "mg"),
+    client = con,
+    idempotency_key = "prep-answer-1"
+  )
   expect_s3_class(ps, "vmx_prep_status")
   expect_equal(env$req$body$data$dose_unit, "mg")
+  expect_equal(env$req$body$data$idempotency_key, "prep-answer-1")
   expect_match(env$req$url, "/datasets/ds_1/prep-answers$")
 })
 
 test_that("vmx_prep_answer rejects a non-named answers arg", {
   expect_error(vmx_prep_answer("ds_1", list(1, 2), client = con), class = "vmx_usage_error")
+  expect_error(
+    vmx_prep_answer("ds_1", list(), client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_prep_answer(
+      "ds_1", list(idempotency_key = "not-an-answer"), client = con
+    ),
+    class = "vmx_usage_error"
+  )
+})
+
+test_that("vmx_prep_questions rejects duplicate answer keys", {
+  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+    dataset_id = "ds_1",
+    status = "awaiting_input",
+    prompt = list(
+      message = "Need info",
+      fields = list(
+        list(field = "dose_unit", question = "Units?", required = TRUE),
+        list(field = "dose_unit", question = "Units again?", required = TRUE)
+      )
+    )
+  ))))
+  expect_error(
+    vmx_prep_questions("ds_1", client = con),
+    class = "vmx_response_error"
+  )
 })

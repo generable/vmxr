@@ -67,19 +67,49 @@ vmx_resource_id <- function(x) {
 #' @noRd
 vmx_id <- function(x, prefix = NULL, arg = "id") {
   id <- if (inherits(x, "vmx_resource")) vmx_resource_id(x) else x
-  if (!is.character(id) || length(id) != 1L || is.na(id) || !nzchar(id)) {
+  if (!is.character(id) || length(id) != 1L || is.na(id) ||
+      !nzchar(trimws(id))) {
     vmx_abort(
       sprintf("`%s` must be a single id string or a vmx object.", arg),
       class = "vmx_usage_error"
     )
   }
-  if (!is.null(prefix) && !startsWith(id, paste0(prefix, "_"))) {
+  if (!is.null(prefix) &&
+      (!startsWith(id, paste0(prefix, "_")) ||
+        nchar(id) <= nchar(prefix) + 1L)) {
     vmx_abort(
       sprintf("`%s` should be a '%s_*' id, got '%s'.", arg, prefix, id),
       class = "vmx_usage_error"
     )
   }
   id
+}
+
+# Validate a scalar or vector of non-blank strings without silently coercing
+# numbers or other values into API text fields.
+vmx_nonempty_strings <- function(x, arg, exactly_one = FALSE,
+                                 unique = FALSE) {
+  if (is.factor(x)) x <- as.character(x)
+  valid <- is.character(x) && length(x) > 0L && !anyNA(x) &&
+    all(nzchar(trimws(x)))
+  if (!valid || (isTRUE(exactly_one) && length(x) != 1L)) {
+    count <- if (isTRUE(exactly_one)) {
+      "one non-empty string"
+    } else {
+      "one or more non-empty strings"
+    }
+    vmx_abort(
+      sprintf("`%s` must be %s.", arg, count),
+      class = "vmx_usage_error"
+    )
+  }
+  if (isTRUE(unique) && anyDuplicated(x)) {
+    vmx_abort(
+      sprintf("`%s` must not contain duplicates.", arg),
+      class = "vmx_usage_error"
+    )
+  }
+  as.character(x)
 }
 
 #' Convert a `DvTable` envelope (columns + row-objects) into a typed tibble
@@ -286,6 +316,10 @@ vmx_page_to_tibble <- function(page, context = "collection response") {
   out <- vmx_items_to_tibble(items)
   attr(out, "next_cursor") <- next_cursor
   attr(out, "has_next_page") <- has_next_page
+  attr(out, "vmx_metadata") <- page[setdiff(
+    names(page),
+    c("items", "next_cursor", "has_next_page")
+  )]
   out
 }
 

@@ -72,6 +72,34 @@ test_that("vmx_treatments returns an empty tibble when there are none", {
   expect_equal(nrow(vmx_treatments(client = con)), 0L)
 })
 
+test_that("collection pages reject inconsistent cursors and invalid limits", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      items = list(),
+      next_cursor = "unexpected",
+      has_next_page = FALSE
+    ))
+  ))
+  expect_error(
+    vmx_treatments(client = con),
+    class = "vmx_response_error"
+  )
+  expect_error(
+    vmx_treatments(client = con, limit = 201),
+    class = "vmx_usage_error"
+  )
+})
+
+test_that("single-resource responses must match the requested id", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = tmt_item("tmt_other", "Other"))
+  ))
+  expect_error(
+    vmx_treatment("tmt_1", client = con),
+    class = "vmx_response_error"
+  )
+})
+
 test_that("treatment updates preserve only contract-nullable NULL fields", {
   captured <- new.env()
   httr2::local_mocked_responses(function(req) {

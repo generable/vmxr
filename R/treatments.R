@@ -38,6 +38,17 @@ vmx_treatment <- function(id, client = vmx_client()) {
 #' @export
 vmx_treatment_create <- function(name, indication = NULL, description = NULL,
                                  client = vmx_client()) {
+  name <- vmx_nonempty_strings(name, "name", exactly_one = TRUE)
+  if (!is.null(indication)) {
+    indication <- vmx_nonempty_strings(
+      indication, "indication", exactly_one = TRUE
+    )
+  }
+  if (!is.null(description)) {
+    description <- vmx_nonempty_strings(
+      description, "description", exactly_one = TRUE
+    )
+  }
   body <- vmx_compact(list(name = name, indication = indication,
                            description = description))
   new_vmx_resource(vmx_post(client, "/treatments", body), "vmx_treatment", "treatment_id")

@@ -21,6 +21,7 @@ vmx_upload <- function(study, files,
                        treatment = NULL, config = NULL, wait = FALSE,
                        client = vmx_client(), ...) {
   mode <- match.arg(mode)
+  files <- vmx_nonempty_strings(files, "files", unique = TRUE)
   std_id <- vmx_id(study, "std", arg = "study")
   tmt_id <- if (!is.null(treatment)) {
     vmx_id(treatment, "tmt", arg = "treatment")
@@ -54,7 +55,10 @@ vmx_upload <- function(study, files,
 
   req <- httr2::req_method(vmx_req(client, "/datasets"), "POST") |>
     httr2::req_body_multipart(!!!parts, !!!file_parts)
-  ds <- new_vmx_resource(vmx_perform(req), "vmx_dataset", "dataset_id")
+  data <- vmx_perform(req)
+  vmx_validate_response_id(data, "study_id", std_id, "dataset upload")
+  vmx_validate_response_id(data, "treatment_id", tmt_id, "dataset upload")
+  ds <- new_vmx_resource(data, "vmx_dataset", "dataset_id")
 
   if (isTRUE(wait)) vmx_wait(ds, client = client, ...) else ds
 }
@@ -209,7 +213,7 @@ vmx_upload_unignore <- function(dataset, upload, client = vmx_client()) {
 #' @noRd
 vmx_set_upload_ignored <- function(dataset, upload, ignored, client) {
   endpoint <- if (ignored) "ignore-upload" else "unignore-upload"
-  upload_id <- if (inherits(upload, "vmx_resource")) vmx_resource_id(upload) else upload
+  upload_id <- vmx_id(upload, "upl", "upload")
   dataset_id <- vmx_id(dataset, "ds", arg = "dataset")
   data <- vmx_post(
     client,

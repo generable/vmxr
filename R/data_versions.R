@@ -55,12 +55,29 @@ vmx_data_version <- function(id, client = vmx_client()) {
 #' @export
 vmx_data_version_create <- function(dataset, uploads, prior_config = NULL,
                                     client = vmx_client()) {
+  dataset_id <- vmx_id(dataset, "ds", "dataset")
+  uploads <- vmx_nonempty_strings(
+    uploads, "uploads", unique = TRUE
+  )
+  upload_ids <- vapply(
+    uploads,
+    vmx_id,
+    character(1),
+    prefix = "upl",
+    arg = "uploads"
+  ) |> unname()
   body <- vmx_compact(list(
-    upload_ids = as.list(uploads),
+    upload_ids = as.list(upload_ids),
     prior_config_data_version_id = vmx_opt_id(prior_config, "dv", "prior_config")
   ))
-  data <- vmx_post(client, paste0("/datasets/", vmx_id(dataset, "ds", "dataset"),
-                                  "/data-versions"), body)
+  data <- vmx_post(
+    client,
+    paste0("/datasets/", dataset_id, "/data-versions"),
+    body
+  )
+  vmx_validate_response_id(
+    data, "dataset_id", dataset_id, "data-version creation"
+  )
   new_vmx_resource(data, "vmx_prep_status", "dataset_id")
 }
 
@@ -110,18 +127,46 @@ vmx_data_version_table <- function(dv, domain = c("subjects", "pk", "dosing", "p
 #' @return The export envelope (list), or, when `dest` is set, `dest` invisibly.
 #' @export
 vmx_data_version_export <- function(dv, dest = NULL, client = vmx_client()) {
-  envelope <- vmx_get(client, paste0("/data-versions/", vmx_id(dv, "dv"), "/export"))
+  data_version_id <- vmx_id(dv, "dv")
+  envelope <- vmx_get(
+    client, paste0("/data-versions/", data_version_id, "/export")
+  )
+  vmx_validate_response_id(
+    envelope, "data_version_id", data_version_id, "data-version export"
+  )
+  url <- vmx_response_scalar(
+    vmx_response_field(
+      envelope, "download_url", "data-version export.download_url"
+    ),
+    "data-version export.download_url",
+    type = "character",
+    nonempty = TRUE
+  )
   if (is.null(dest)) {
     return(envelope)
   }
-  url <- envelope$download_url %||% envelope$url
-  if (is.null(url)) {
-    vmx_abort("Export envelope did not contain a download URL.", class = "vmx_api_error")
+  if (!is.character(dest) || length(dest) != 1L || is.na(dest) ||
+      !nzchar(trimws(dest))) {
+    vmx_abort(
+      "`dest` must be one non-empty file path.",
+      class = "vmx_usage_error"
+    )
   }
   # Anonymous request: the signed URL carries its own credentials; sending the
   # API bearer to GCS would leak the token and is rejected anyway.
-  httr2::request(url) |>
-    httr2::req_perform(path = dest)
+  tryCatch(
+    httr2::request(url) |>
+      httr2::req_perform(path = dest),
+    error = function(e) {
+      # Do not attach the transport condition: it may contain the signed URL
+      # (and therefore its temporary credentials).
+      vmx_abort(
+        "Data-version export download failed.",
+        class = "vmx_api_error",
+        reason = "export_download_failed"
+      )
+    }
+  )
   invisible(dest)
 }
 

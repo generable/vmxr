@@ -42,6 +42,23 @@ test_that("vmx_nca creates without waiting and posts the right body", {
   expect_match(env$req$url, "/nca-analyses$")
 })
 
+test_that("vmx_nca validates scalar controls and retry ids", {
+  expect_error(
+    vmx_nca(
+      "dv_1", c("observed", "nominal"),
+      wait = FALSE, client = con
+    ),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_nca(
+      "dv_1", "observed", retried_from = "run_wrong",
+      wait = FALSE, client = con
+    ),
+    class = "vmx_usage_error"
+  )
+})
+
 test_that("vmx_nca with wait=TRUE polls to a terminal state", {
   httr2::local_mocked_responses(list(
     httr2::response_json(body = nca_item("nca_9", "queued")),   # create

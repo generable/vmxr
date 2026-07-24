@@ -26,6 +26,12 @@
 * Nullable update fields can be explicitly cleared without allowing `NULL` for
   required fields. OIDC caches now reject structurally invalid tokens and fail
   loudly if secure atomic replacement does not succeed.
+* Prep-question tibbles now retain defaults, grouping, resolution hints,
+  referents, rationales, and data previews. Prep answers support idempotency
+  keys, data-version exports require the canonical matching envelope, and
+  create helpers reject malformed upload compositions, retry identifiers,
+  simulation bounds, and ambiguous scalar inputs before dispatch.
+* Study listing now exposes the API's `created_since` filter.
 
 * `vmx_login()` device-code prompt now matches the actual flow (GEN-2378).
   Because the browser is opened at `verification_uri_complete` (the URL that

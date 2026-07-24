@@ -9,7 +9,8 @@ vmx_studies(
   status = NULL,
   client = vmx_client(),
   cursor = NULL,
-  limit = NULL
+  limit = NULL,
+  created_since = NULL
 )
 }
 \arguments{
@@ -23,6 +24,9 @@ across all treatments.}
 \item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
 
 \item{limit}{Server page-size hint (1--200).}
+
+\item{created_since}{Optional lower creation-time bound: a
+\code{POSIXct}/\code{Date} or ISO-8601 string.}
 }
 \value{
 One server-owned page as a tibble.

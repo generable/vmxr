@@ -37,6 +37,19 @@ test_that("vmx_data_version_table validates the domain", {
   expect_error(vmx_data_version_table("dv_1", "bogus", client = con))
 })
 
+test_that("data-version table rows must match the declared schema", {
+  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+    data_version_id = "dv_1",
+    domain = "pk",
+    columns = list(list(name = "time", type = "number")),
+    rows = list(list(time = 1, undeclared = "x"))
+  ))))
+  expect_error(
+    vmx_pk("dv_1", client = con),
+    class = "vmx_response_error"
+  )
+})
+
 test_that("model-data accessors hit the right domain", {
   for (d in c("pk", "subjects", "dosing", "pd")) {
     env <- new.env()

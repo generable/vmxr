@@ -158,7 +158,8 @@ vmx_compact <- function(x) {
 
 # Validate an opaque cursor or similar non-blank scalar without interpreting it.
 vmx_id_like_scalar <- function(x, arg) {
-  if (!is.character(x) || length(x) != 1L || is.na(x) || !nzchar(x)) {
+  if (!is.character(x) || length(x) != 1L || is.na(x) ||
+      !nzchar(trimws(x))) {
     vmx_abort(
       sprintf("`%s` must be one non-empty string.", arg),
       class = "vmx_usage_error"
