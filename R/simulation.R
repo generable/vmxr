@@ -197,17 +197,13 @@ vmx_sim_population_from_text <- function(fit, dosing_text, scenario_name,
 
 #' List simulation jobs for a model fit
 #' @param fit A fit id or `vmx_model_fit`.
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return One server-owned page as a tibble.
+#' @return A tibble containing all simulation jobs for the fit.
 #' @export
-vmx_sim_jobs <- function(fit, client = vmx_client(),
-                         cursor = NULL, limit = NULL) {
-  vmx_get_page(
+vmx_sim_jobs <- function(fit, client = vmx_client()) {
+  vmx_paginate(
     client,
-    paste0("/model-fits/", vmx_id(fit, "mf", "fit"), "/simulation-jobs"),
-    list(cursor = cursor, limit = limit)
+    paste0("/model-fits/", vmx_id(fit, "mf", "fit"), "/simulation-jobs")
   )
 }
 

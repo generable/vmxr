@@ -7,25 +7,20 @@
 #' @param status Optional status filter (`queued`/`running`/`completed`/
 #'   `degraded`/`failed`).
 #' @param time_basis Optional time-basis filter.
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return One server-owned page as a tibble.
+#' @return A tibble containing all matching analyses.
 #' @export
 vmx_nca_analyses <- function(data_version = NULL, study = NULL, treatment = NULL,
                              status = NULL, time_basis = NULL,
-                             client = vmx_client(),
-                             cursor = NULL, limit = NULL) {
+                             client = vmx_client()) {
   params <- list(
     data_version_id = vmx_opt_id(data_version, "dv", "data_version"),
     study_id = vmx_opt_id(study, "std", "study"),
     treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
     status = status,
-    time_basis = time_basis,
-    cursor = cursor,
-    limit = limit
+    time_basis = time_basis
   )
-  vmx_get_page(client, "/nca-analyses", params)
+  vmx_paginate(client, "/nca-analyses", params)
 }
 
 #' Run an NCA analysis

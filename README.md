@@ -12,7 +12,7 @@ modeling &rarr; simulation workflow in ergonomic, pipe-friendly verbs that
 Our users are pharmacometricians who work in R/RStudio; `vmxr` keeps the whole
 analysis next to their data instead of shuttling files and IDs through a shell.
 
-> **Status: functional (v0.2.0 development), pre-CRAN.** The client covers the full analysis
+> **Status: functional (v0.2.0), pre-CRAN.** The client covers the full analysis
 > workflow end to end — treatments, studies, datasets and prep, data versions,
 > modeling-data tables, NCA, modeling (build runs, fits, estimates), simulation,
 > and the study analysis log. Contract-shaped responses are covered by the
@@ -96,9 +96,9 @@ automatically, prompting `vmx_login()` only when there's no usable cached token.
 ## Design
 
 The package exposes a curated, hand-written public API in `R/*.R` that adds
-polling, server-owned cursor navigation, multipart upload, and tibble/S3
-conversion. Collection functions return one page; use `vmx_next_cursor()` and
-`vmx_has_next_page()` to request another page explicitly. The OpenAPI
+polling, automatic cursor pagination, multipart upload, and tibble/S3
+conversion. Collection functions return all matching rows while keeping
+server cursors opaque. The OpenAPI
 snapshot/codegen path is still a development task, not a shipped generated
 binding layer.
 

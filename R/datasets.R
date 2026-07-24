@@ -99,20 +99,15 @@ vmx_study_treatment_id <- function(study, client) {
 #' List datasets
 #' @param study Optional study filter.
 #' @param treatment Optional treatment filter.
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return One server-owned page as a tibble.
+#' @return A tibble containing all matching datasets.
 #' @export
-vmx_datasets <- function(study = NULL, treatment = NULL, client = vmx_client(),
-                         cursor = NULL, limit = NULL) {
+vmx_datasets <- function(study = NULL, treatment = NULL, client = vmx_client()) {
   params <- list(
     study_id = vmx_opt_id(study, "std", "study"),
-    treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
-    cursor = cursor,
-    limit = limit
+    treatment_id = vmx_opt_id(treatment, "tmt", "treatment")
   )
-  vmx_get_page(client, "/datasets", params)
+  vmx_paginate(client, "/datasets", params)
 }
 
 #' Fetch one dataset
@@ -129,19 +124,12 @@ vmx_dataset <- function(id, client = vmx_client()) {
 
 #' List the files in a dataset
 #' @param dataset A dataset id or `vmx_dataset`.
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return One server-owned page as a tibble.
+#' @return A tibble containing all files in the dataset.
 #' @export
-vmx_dataset_files <- function(dataset, client = vmx_client(),
-                              cursor = NULL, limit = NULL) {
+vmx_dataset_files <- function(dataset, client = vmx_client()) {
   id <- vmx_id(dataset, "ds", arg = "dataset")
-  vmx_get_page(
-    client,
-    paste0("/datasets/", id, "/files"),
-    list(cursor = cursor, limit = limit)
-  )
+  vmx_paginate(client, paste0("/datasets/", id, "/files"))
 }
 
 #' The tags on a dataset

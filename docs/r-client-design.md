@@ -41,8 +41,7 @@ workflow inside the R session next to the user's data.
 
 - First-class R client covering the full analysis workflow (treatments →
   studies → datasets → data-versions → NCA → modeling → simulation).
-- Ergonomic, pipe-friendly verbs that hide async polling and expose
-  server-owned cursor pages without unbounded implicit aggregation.
+- Ergonomic, pipe-friendly verbs that hide async polling and cursor pagination.
 - Native return types: tibbles for collections, typed S3 objects for resources.
 - One auth model, identical to the CLI (`VMX_API_TOKEN` Authentik PAT).
 - **No business logic** — the API stays the single source of truth; the client
@@ -173,8 +172,8 @@ clients/r/
   (`op_datasets_upload()`, `op_treatments_list()`, …). Mechanical: build request,
   send, parse JSON to a list, surface HTTP errors. Regenerated whenever
   `openapi.json` changes. Users normally never call these directly.
-- **Ergonomic (`R/*.R`)** — the curated public API. Adds polling, explicit
-  cursor-page navigation, multipart upload, tibble/S3 conversion, and the
+- **Ergonomic (`R/*.R`)** — the curated public API. Adds polling, automatic
+  cursor pagination, multipart upload, tibble/S3 conversion, and the
   workflow verbs. This layer is
   small, stable, and is what the docs and vignettes teach.
 
@@ -228,9 +227,9 @@ in the object but **redacted in `print()`** and never logged.
   (`"ds_…"`) or the S3 object returned by a prior call. ID prefixes are
   validated client-side (matching the CLI's fail-fast behavior).
 - **Return types:**
-  - Collection endpoints → **tibble** for exactly one server-owned page (one
-    row per item; list-columns for nested fields). `vmx_next_cursor()` and
-    `vmx_has_next_page()` expose explicit traversal.
+  - Collection endpoints → **tibble** containing all matching rows (one row per
+    item; list-columns for nested fields), with opaque server cursors followed
+    automatically.
   - Single resource → typed **S3 object** (`vmx_treatment`, `vmx_dataset`,
     `vmx_data_version`, `vmx_nca_analysis`, …) with `print`/`format`/`as_tibble`
     methods.

@@ -8,8 +8,6 @@ vmx_studies(
   treatment = NULL,
   status = NULL,
   client = vmx_client(),
-  cursor = NULL,
-  limit = NULL,
   created_since = NULL
 )
 }
@@ -21,15 +19,11 @@ across all treatments.}
 
 \item{client}{A \code{vmx_client}.}
 
-\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
-
-\item{limit}{Server page-size hint (1--200).}
-
 \item{created_since}{Optional lower creation-time bound: a
 \code{POSIXct}/\code{Date} or ISO-8601 string.}
 }
 \value{
-One server-owned page as a tibble.
+A tibble containing all matching studies.
 }
 \description{
 List studies for a treatment

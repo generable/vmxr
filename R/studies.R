@@ -6,21 +6,17 @@
 #' @param status Optional status filter.
 #' @param created_since Optional lower creation-time bound: a
 #'   `POSIXct`/`Date` or ISO-8601 string.
-#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
-#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return One server-owned page as a tibble.
+#' @return A tibble containing all matching studies.
 #' @export
 vmx_studies <- function(treatment = NULL, status = NULL, client = vmx_client(),
-                        cursor = NULL, limit = NULL, created_since = NULL) {
+                        created_since = NULL) {
   params <- list(
     treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
     status = status,
-    created_since = vmx_format_time(created_since, arg = "created_since"),
-    cursor = cursor,
-    limit = limit
+    created_since = vmx_format_time(created_since, arg = "created_since")
   )
-  vmx_get_page(client, "/studies", params)
+  vmx_paginate(client, "/studies", params)
 }
 
 #' Fetch one study

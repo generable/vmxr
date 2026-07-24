@@ -4,23 +4,51 @@ con <- vmx_client(base_url = "https://vmx.test", token = "pat_test")
 
 test_that("vmx_analysis_log paginates and forwards filters", {
   env <- new.env()
+  env$urls <- character()
+  i <- 0L
   httr2::local_mocked_responses(function(req) {
     env$req <- req
+    env$urls <- c(env$urls, req$url)
+    i <<- i + 1L
     httr2::response_json(body = list(
       study_id = "std_1",
-      items = list(list(kind = "event", event_type = "nca.completed", outcome = "success")),
-      next_cursor = NA_character_,
-      has_next_page = FALSE
+      items = list(list(
+        kind = "event",
+        event_type = if (i == 1L) "nca.completed" else "model.completed",
+        outcome = "success"
+      )),
+      next_cursor = if (i == 1L) "older-events" else NA_character_,
+      has_next_page = i == 1L
     ))
   })
   tbl <- vmx_analysis_log("std_1", kind = "event",
                           since = as.POSIXct("2026-01-01 00:00:00", tz = "UTC"),
                           client = con)
-  expect_equal(nrow(tbl), 1L)
+  expect_equal(nrow(tbl), 2L)
   expect_match(env$req$url, "/studies/std_1/analysis-log")
   expect_match(env$req$url, "kind=event")
   expect_match(env$req$url, "since=2026-01-01")   # POSIXct -> ISO-8601
+  expect_true(all(grepl("kind=event", env$urls, fixed = TRUE)))
+  expect_match(env$urls[[2]], "cursor=older-events")
   expect_equal(attr(tbl, "vmx_metadata")$study_id, "std_1")
+})
+
+test_that("vmx_analysis_log validates study identity on every page", {
+  i <- 0L
+  httr2::local_mocked_responses(function(req) {
+    i <<- i + 1L
+    httr2::response_json(body = list(
+      study_id = if (i == 1L) "std_1" else "std_other",
+      items = list(),
+      next_cursor = if (i == 1L) "next" else NA_character_,
+      has_next_page = i == 1L
+    ))
+  })
+
+  expect_error(
+    vmx_analysis_log("std_1", client = con),
+    class = "vmx_response_error"
+  )
 })
 
 test_that("vmx_analysis_log accepts a resource object", {

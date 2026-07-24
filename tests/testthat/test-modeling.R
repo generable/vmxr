@@ -120,7 +120,6 @@ test_that("vmx_model_fits and vmx_model_fit work", {
   ))))
   fits <- vmx_model_fits(run = "run_1", client = con)
   expect_equal(fits$model_fit_id, "mf_1")
-  expect_false(vmx_has_next_page(fits))
 
   httr2::local_mocked_responses(list(httr2::response_json(body = list(
     metadata = list(model_fit_id = "mf_1", a = 1),

@@ -122,36 +122,53 @@ vmx_patch <- function(client, path, body = NULL) {
   vmx_perform(req)
 }
 
-#' Fetch one canonical server-owned collection page
+#' Fetch and combine every page of a cursor-paginated collection
 #'
-#' The API contract owns page boundaries. This helper does not follow
-#' `next_cursor`; the opaque cursor and `has_next_page` flag are attached to
-#' the returned tibble by `vmx_page_to_tibble()`.
+#' Cursors remain opaque: this helper only sends each server-provided
+#' `next_cursor` back to the same endpoint with the same filters. Every page is
+#' validated before its rows are combined. Repeated cursors fail loudly instead
+#' of looping forever.
+#'
+#' @param validate_page Optional callback for endpoint-specific page checks.
 #' @keywords internal
 #' @noRd
-vmx_get_page <- function(client, path, params = list()) {
-  params <- vmx_validate_page_params(params)
-  vmx_page_to_tibble(vmx_get(client, path, params), context = path)
-}
+vmx_paginate <- function(client, path, params = list(), validate_page = NULL) {
+  query <- vmx_compact(params)
+  pages <- list()
+  metadata <- NULL
+  metadata_set <- FALSE
+  seen_cursors <- character()
 
-vmx_validate_page_params <- function(params) {
-  params <- vmx_compact(params)
-  if (!is.null(params$cursor)) {
-    vmx_id_like_scalar(params$cursor, "cursor")
-  }
-  if (!is.null(params$limit)) {
-    if (!is.numeric(params$limit) || length(params$limit) != 1L ||
-        is.na(params$limit) || !is.finite(params$limit) ||
-        params$limit != floor(params$limit) ||
-        params$limit < 1L || params$limit > 200L) {
-      vmx_abort(
-        "`limit` must be one integer between 1 and 200.",
-        class = "vmx_usage_error"
+  repeat {
+    raw_page <- vmx_get(client, path, query)
+    if (!is.null(validate_page)) {
+      validate_page(raw_page)
+    }
+    page <- vmx_page_to_tibble(raw_page, context = path)
+    if (!metadata_set) {
+      metadata <- attr(page, "vmx_metadata", exact = TRUE)
+      metadata_set <- TRUE
+    }
+
+    cursor <- attr(page, "next_cursor", exact = TRUE)
+    attr(page, "next_cursor") <- NULL
+    attr(page, "has_next_page") <- NULL
+    attr(page, "vmx_metadata") <- NULL
+    pages[[length(pages) + 1L]] <- page
+    if (is.null(cursor)) break
+    if (cursor %in% seen_cursors) {
+      vmx_abort_response(
+        sprintf("%s returned a repeated pagination cursor.", path),
+        field = "next_cursor"
       )
     }
-    params$limit <- as.integer(params$limit)
+    seen_cursors <- c(seen_cursors, cursor)
+    query$cursor <- cursor
   }
-  params
+
+  out <- vctrs::vec_rbind(!!!pages)
+  attr(out, "vmx_metadata") <- metadata
+  out
 }
 
 #' Drop NULL-valued elements of a list

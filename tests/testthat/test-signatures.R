@@ -60,4 +60,21 @@ test_that("new options do not shift existing positional client arguments", {
       "resource", "client"
     )
   )
+
+  collection_functions <- list(
+    vmx_treatments,
+    vmx_studies,
+    vmx_datasets,
+    vmx_dataset_files,
+    vmx_data_versions,
+    vmx_nca_analyses,
+    vmx_model_build_runs,
+    vmx_model_build_logs,
+    vmx_model_fits,
+    vmx_sim_jobs,
+    vmx_analysis_log
+  )
+  for (fn in collection_functions) {
+    expect_false(any(c("cursor", "limit") %in% names(formals(fn))))
+  }
 })

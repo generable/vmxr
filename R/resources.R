@@ -217,28 +217,6 @@ vmx_coerce_col <- function(vals, type) {
   )
 }
 
-#' Get the opaque cursor for the next API page
-#'
-#' Collection functions return exactly one server-owned page as a tibble. Use
-#' this helper to obtain the cursor to pass back through the collection
-#' function's `cursor` argument.
-#'
-#' @param x A tibble returned by a vmxr collection function.
-#' @return The next cursor as a string, or `NULL` on the last page.
-#' @export
-vmx_next_cursor <- function(x) {
-  attr(x, "next_cursor", exact = TRUE)
-}
-
-#' Test whether an API page has a following page
-#'
-#' @inheritParams vmx_next_cursor
-#' @return A single logical value.
-#' @export
-vmx_has_next_page <- function(x) {
-  isTRUE(attr(x, "has_next_page", exact = TRUE))
-}
-
 #' Resolve an optional id argument (`NULL` passes through)
 #' @keywords internal
 #' @noRd
@@ -281,8 +259,8 @@ vmx_items_to_tibble <- function(items) {
 
 #' Convert one canonical API page into a tibble
 #'
-#' The cursor remains opaque and is attached to the returned tibble rather than
-#' decoded or followed automatically.
+#' The cursor remains opaque and is attached for the internal paginator to
+#' return unchanged on the next request.
 #' @keywords internal
 #' @noRd
 vmx_page_to_tibble <- function(page, context = "collection response") {
