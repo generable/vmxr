@@ -10,16 +10,25 @@ vmx_model_fits(
   model_type = NULL,
   marker_name = NULL,
   status = NULL,
-  client = vmx_client()
+  client = vmx_client(),
+  treatment = NULL,
+  study = NULL,
+  source_pk_model_fit = NULL,
+  cursor = NULL,
+  limit = NULL
 )
 }
 \arguments{
-\item{run, data_version, model_type, marker_name, status}{Optional filters.}
+\item{run, data_version, treatment, study, model_type, marker_name, }{source_pk_model_fit,status Optional filters.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+
+\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-A tibble.
+One server-owned page as a tibble.
 }
 \description{
 List model fits

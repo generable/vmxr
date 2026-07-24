@@ -15,6 +15,8 @@ vmx_fit_subject_estimates(fit, client = vmx_client())
 A tibble.
 }
 \description{
-One row per subject x parameter, with the posterior point estimate (\code{value})
-and credible interval (\code{ci_lower}/\code{ci_upper}).
+One row per subject x estimate. \code{value_statistic}, \code{interval_kind}, and
+\code{interval_level} preserve the server-selected estimate semantics;
+\code{interval_lower} and \code{interval_upper} are the corresponding bounds. Tagged
+estimate metadata is retained as columns rather than interpreted by vmxr.
 }

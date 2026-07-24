@@ -29,17 +29,57 @@ dv_item <- function(id, study = "std_1") {
        source_dataset_id = "ds_1", status = "ready", eligible_for_modeling = TRUE)
 }
 
-test_that("vmx_studies filters by treatment and paginates into a tibble", {
+test_that("vmx_studies returns one filtered page and accepts its cursor", {
   cm <- capturing_mock(list(
-    list(items = list(study_item("std_1", "A")), next_cursor = "c1"),
-    list(items = list(study_item("std_2", "B")), next_cursor = NULL)
+    list(
+      items = list(study_item("std_1", "A")),
+      next_cursor = "c1",
+      has_next_page = TRUE
+    ),
+    list(
+      items = list(study_item("std_2", "B")),
+      next_cursor = NA_character_,
+      has_next_page = FALSE
+    )
   ))
   httr2::local_mocked_responses(cm$mock)
-  tbl <- vmx_studies("tmt_1", client = con)
-  expect_equal(nrow(tbl), 2L)
-  expect_equal(tbl$study_id, c("std_1", "std_2"))
+  first <- vmx_studies("tmt_1", client = con)
+  expect_equal(first$study_id, "std_1")
+  expect_equal(vmx_next_cursor(first), "c1")
+  expect_true(vmx_has_next_page(first))
+
+  second <- vmx_studies(
+    "tmt_1",
+    cursor = vmx_next_cursor(first),
+    client = con
+  )
+  expect_equal(second$study_id, "std_2")
+  expect_null(vmx_next_cursor(second))
+  expect_false(vmx_has_next_page(second))
   # treatment_id forwarded as a query param
   expect_match(cm$captured$req$url, "treatment_id=tmt_1")
+  expect_match(cm$captured$req$url, "cursor=c1")
+})
+
+test_that("collection flattening keeps nested arrays in one row", {
+  markers <- list(
+    list(name = "effect", type = "continuous"),
+    list(name = "response", type = "count")
+  )
+  item <- study_item("std_1", "A")
+  item$pd_markers <- markers
+  cm <- capturing_mock(list(
+    items = list(item),
+    next_cursor = NA_character_,
+    has_next_page = FALSE
+  ))
+  httr2::local_mocked_responses(cm$mock)
+
+  tbl <- vmx_studies(client = con)
+
+  expect_equal(nrow(tbl), 1L)
+  expect_type(tbl$pd_markers, "list")
+  expect_equal(tbl$pd_markers[[1]], markers)
 })
 
 test_that("vmx_studies rejects a non-treatment id", {
@@ -66,8 +106,36 @@ test_that("vmx_study_create accepts a vmx_treatment object", {
   expect_equal(cm$captured$req$body$data$treatment_id, "tmt_7")
 })
 
+test_that("vmx_study_update preserves an explicitly supplied JSON null", {
+  cm <- capturing_mock(study_item("std_1", "A"))
+  httr2::local_mocked_responses(cm$mock)
+
+  vmx_study_update(
+    "std_1",
+    route_of_administration = NULL,
+    client = con
+  )
+
+  body <- cm$captured$req$body$data
+  expect_true("route_of_administration" %in% names(body))
+  expect_null(body$route_of_administration)
+
+  expect_error(
+    vmx_study_update("std_1", pd_markers = NULL, client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_study_update("std_1", status = NULL, client = con),
+    class = "vmx_usage_error"
+  )
+})
+
 test_that("vmx_data_versions forwards filters as query params", {
-  cm <- capturing_mock(list(items = list(dv_item("dv_1")), next_cursor = NULL))
+  cm <- capturing_mock(list(
+    items = list(dv_item("dv_1")),
+    next_cursor = NA_character_,
+    has_next_page = FALSE
+  ))
   httr2::local_mocked_responses(cm$mock)
   tbl <- vmx_data_versions(study = "std_1", eligible_for_modeling = TRUE, client = con)
   expect_equal(nrow(tbl), 1L)
@@ -78,7 +146,11 @@ test_that("vmx_data_versions forwards filters as query params", {
 })
 
 test_that("vmx_data_versions accepts a vmx_study object", {
-  cm <- capturing_mock(list(items = list(dv_item("dv_1", study = "std_7")), next_cursor = NULL))
+  cm <- capturing_mock(list(
+    items = list(dv_item("dv_1", study = "std_7")),
+    next_cursor = NA_character_,
+    has_next_page = FALSE
+  ))
   httr2::local_mocked_responses(cm$mock)
   study <- new_vmx_resource(list(study_id = "std_7"), "vmx_study", "study_id")
   vmx_data_versions(study = study, client = con)

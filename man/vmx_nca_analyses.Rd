@@ -10,7 +10,9 @@ vmx_nca_analyses(
   treatment = NULL,
   status = NULL,
   time_basis = NULL,
-  client = vmx_client()
+  client = vmx_client(),
+  cursor = NULL,
+  limit = NULL
 )
 }
 \arguments{
@@ -26,9 +28,13 @@ vmx_nca_analyses(
 \item{time_basis}{Optional time-basis filter.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+
+\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-A tibble, one row per analysis.
+One server-owned page as a tibble.
 }
 \description{
 List NCA analyses

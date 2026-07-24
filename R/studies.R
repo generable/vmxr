@@ -4,15 +4,20 @@
 #' @param treatment A treatment id (`tmt_...`) or `vmx_treatment`; `NULL` lists
 #'   across all treatments.
 #' @param status Optional status filter.
+#' @param cursor Opaque cursor returned by [vmx_next_cursor()].
+#' @param limit Server page-size hint (1--200).
 #' @param client A `vmx_client`.
-#' @return A tibble, one row per study.
+#' @return One server-owned page as a tibble.
 #' @export
-vmx_studies <- function(treatment = NULL, status = NULL, client = vmx_client()) {
+vmx_studies <- function(treatment = NULL, status = NULL, client = vmx_client(),
+                        cursor = NULL, limit = NULL) {
   params <- list(
     treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
-    status = status
+    status = status,
+    cursor = cursor,
+    limit = limit
   )
-  vmx_items_to_tibble(vmx_paginate(client, "/studies", params))
+  vmx_get_page(client, "/studies", params)
 }
 
 #' Fetch one study
@@ -21,7 +26,9 @@ vmx_studies <- function(treatment = NULL, status = NULL, client = vmx_client()) 
 #' @return A `vmx_study`.
 #' @export
 vmx_study <- function(id, client = vmx_client()) {
-  data <- vmx_get(client, paste0("/studies/", vmx_id(id, "std")))
+  study_id <- vmx_id(id, "std")
+  data <- vmx_get(client, paste0("/studies/", study_id))
+  vmx_validate_response_id(data, "study_id", study_id, "study")
   new_vmx_resource(data, "vmx_study", "study_id")
 }
 
@@ -59,7 +66,29 @@ vmx_study_create <- function(treatment, name, study_type = "clinical",
 #' @return A `vmx_study`.
 #' @export
 vmx_study_update <- function(id, ..., client = vmx_client()) {
-  body <- vmx_compact(list(...))
-  data <- vmx_put(client, paste0("/studies/", vmx_id(id, "std")), body)
+  # Preserve explicit NULL so callers can clear nullable set-the-field values
+  # such as route_of_administration; omitted arguments remain absent.
+  body <- list(...)
+  vmx_validate_update_body(
+    body,
+    allowed = c(
+      "name", "description", "study_type", "phase", "status",
+      "route_of_administration", "pd_markers"
+    ),
+    nullable = c(
+      "description", "study_type", "phase", "route_of_administration"
+    ),
+    resource = "study"
+  )
+  if ("pd_markers" %in% names(body) &&
+      (!is.list(body$pd_markers) || !is.null(names(body$pd_markers)))) {
+    vmx_abort(
+      "`pd_markers` must be an array of marker objects; use `list()` to clear it.",
+      class = "vmx_usage_error"
+    )
+  }
+  study_id <- vmx_id(id, "std")
+  data <- vmx_put(client, paste0("/studies/", study_id), body)
+  vmx_validate_response_id(data, "study_id", study_id, "study update")
   new_vmx_resource(data, "vmx_study", "study_id")
 }

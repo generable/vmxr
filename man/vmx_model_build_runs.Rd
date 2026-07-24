@@ -9,16 +9,22 @@ vmx_model_build_runs(
   study = NULL,
   treatment = NULL,
   status = NULL,
-  client = vmx_client()
+  client = vmx_client(),
+  cursor = NULL,
+  limit = NULL
 )
 }
 \arguments{
 \item{data_version, study, treatment, status}{Optional filters.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+
+\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-A tibble.
+One server-owned page as a tibble.
 }
 \description{
 List model build runs

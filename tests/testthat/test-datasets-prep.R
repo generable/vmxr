@@ -15,7 +15,9 @@ test_that("vmx_datasets lists with filters into a tibble", {
   httr2::local_mocked_responses(function(req) {
     env$req <- req
     httr2::response_json(body = list(
-      items = list(list(dataset_id = "ds_1", status = "formatted")), next_cursor = NULL
+      items = list(list(dataset_id = "ds_1", status = "formatted")),
+      next_cursor = NA_character_,
+      has_next_page = FALSE
     ))
   })
   tbl <- vmx_datasets(study = "std_1", client = con)
@@ -28,7 +30,9 @@ test_that("vmx_datasets accepts a vmx_study object", {
   httr2::local_mocked_responses(function(req) {
     env$req <- req
     httr2::response_json(body = list(
-      items = list(list(dataset_id = "ds_1", status = "formatted")), next_cursor = NULL
+      items = list(list(dataset_id = "ds_1", status = "formatted")),
+      next_cursor = NA_character_,
+      has_next_page = FALSE
     ))
   })
   study <- new_vmx_resource(list(study_id = "std_7"), "vmx_study", "study_id")
@@ -65,14 +69,17 @@ test_that("vmx_dataset fetches and types the resource", {
   expect_equal(vmx_resource_id(ds), "ds_1")
 })
 
-test_that("vmx_dataset_files paginates into a tibble", {
+test_that("vmx_dataset_files returns one page as a tibble", {
   httr2::local_mocked_responses(list(httr2::response_json(body = list(
     items = list(list(tagged_upload_id = "tu_1", name = "conc.csv", size = 42L)),
-    next_cursor = NULL
+    next_cursor = NA_character_,
+    has_next_page = FALSE
   ))))
   tbl <- vmx_dataset_files("ds_1", client = con)
   expect_equal(tbl$name, "conc.csv")
   expect_equal(tbl$size, 42L)
+  expect_null(vmx_next_cursor(tbl))
+  expect_false(vmx_has_next_page(tbl))
 })
 
 test_that("vmx_dataset_tags returns a key/value tibble from the object", {

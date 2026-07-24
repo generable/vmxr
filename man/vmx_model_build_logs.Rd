@@ -4,15 +4,27 @@
 \alias{vmx_model_build_logs}
 \title{Build-run logs}
 \usage{
-vmx_model_build_logs(run, client = vmx_client())
+vmx_model_build_logs(
+  run,
+  client = vmx_client(),
+  order = c("desc", "asc"),
+  cursor = NULL,
+  limit = NULL
+)
 }
 \arguments{
 \item{run}{A build-run id or object.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{order}{Newest-first (\code{"desc"}) or oldest-first (\code{"asc"}).}
+
+\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+
+\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-A tibble of log lines.
+One server-owned page of log lines as a tibble.
 }
 \description{
 Build-run logs

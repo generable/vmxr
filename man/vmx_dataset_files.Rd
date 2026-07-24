@@ -4,15 +4,19 @@
 \alias{vmx_dataset_files}
 \title{List the files in a dataset}
 \usage{
-vmx_dataset_files(dataset, client = vmx_client())
+vmx_dataset_files(dataset, client = vmx_client(), cursor = NULL, limit = NULL)
 }
 \arguments{
 \item{dataset}{A dataset id or \code{vmx_dataset}.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{cursor}{Opaque cursor returned by \code{\link[=vmx_next_cursor]{vmx_next_cursor()}}.}
+
+\item{limit}{Server page-size hint (1--200).}
 }
 \value{
-A tibble.
+One server-owned page as a tibble.
 }
 \description{
 List the files in a dataset
