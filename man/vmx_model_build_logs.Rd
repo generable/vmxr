@@ -4,15 +4,17 @@
 \alias{vmx_model_build_logs}
 \title{Build-run logs}
 \usage{
-vmx_model_build_logs(run, client = vmx_client())
+vmx_model_build_logs(run, client = vmx_client(), order = c("desc", "asc"))
 }
 \arguments{
 \item{run}{A build-run id or object.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{order}{Newest-first (\code{"desc"}) or oldest-first (\code{"asc"}).}
 }
 \value{
-A tibble of log lines.
+A tibble containing all log lines in the requested order.
 }
 \description{
 Build-run logs

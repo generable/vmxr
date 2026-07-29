@@ -1,4 +1,37 @@
-# vmxr 0.1.1.9000 (development)
+# vmxr 0.2.0
+
+* Collection functions continue to return all matching rows. Cursor pages are
+  followed automatically with strict envelope validation and repeated-cursor
+  detection, so malformed pagination fails instead of truncating results or
+  looping forever.
+* Estimate helpers now preserve the server-selected point statistic, interval
+  kind, interval level, and additive tagged metadata. They no longer hardcode
+  posterior/credible semantics or silently pad malformed parallel arrays.
+  Observed-vs-predicted helpers consume the current `Estimate` envelope and
+  retain PK/PD units and marker identity.
+* Successful responses are checked for required IDs, array alignment, page
+  consistency, declared table types, and other contract-critical shape
+  invariants. Malformed success payloads raise `vmx_response_error` rather than
+  being silently recycled, truncated, or attached to the wrong resource.
+* PK-only modeling previews now send `pd_markers = []`, matching PK-only model
+  build submission. Simulation inputs validate canonical `simdose_` IDs and
+  subject records, and dosing inputs can be passed to `vmx_wait()`.
+* `vmx_dosing()` exposes the separate dosing-event domain, and
+  `vmx_model_data()` includes `$dosing` while validating required table
+  availability metadata.
+* Polling stops immediately on any terminal state, surfaces safe server failure
+  copy, rejects unknown statuses and invalid controls, and uses resource-specific
+  long-running defaults. NCA, simulation, dosing-input, and model-build defaults
+  include a persistence cushion beyond their worker execution ceilings.
+* Nullable update fields can be explicitly cleared without allowing `NULL` for
+  required fields. OIDC caches now reject structurally invalid tokens and fail
+  loudly if secure atomic replacement does not succeed.
+* Prep-question tibbles now retain defaults, grouping, resolution hints,
+  referents, rationales, and data previews. Prep answers support idempotency
+  keys, data-version exports require the canonical matching envelope, and
+  create helpers reject malformed upload compositions, retry identifiers,
+  simulation bounds, and ambiguous scalar inputs before dispatch.
+* Study listing now exposes the API's `created_since` filter.
 
 * `vmx_login()` device-code prompt now matches the actual flow (GEN-2378).
   Because the browser is opened at `verification_uri_complete` (the URL that

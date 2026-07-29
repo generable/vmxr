@@ -11,7 +11,8 @@ vmx_upload(
   treatment = NULL,
   config = NULL,
   wait = FALSE,
-  client = vmx_client()
+  client = vmx_client(),
+  ...
 )
 }
 \arguments{
@@ -29,6 +30,8 @@ vmx_upload(
 \item{wait}{If \code{TRUE}, block until prep settles.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{...}{Polling controls forwarded to \code{\link[=vmx_wait]{vmx_wait()}} when \code{wait = TRUE}.}
 }
 \value{
 A \code{vmx_dataset} (status \code{"uploaded"}).

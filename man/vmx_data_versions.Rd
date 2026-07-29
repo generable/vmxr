@@ -24,7 +24,7 @@ vmx_data_versions(
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+A tibble containing all matching data versions.
 }
 \description{
 List data versions

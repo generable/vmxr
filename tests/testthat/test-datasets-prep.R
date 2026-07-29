@@ -15,7 +15,9 @@ test_that("vmx_datasets lists with filters into a tibble", {
   httr2::local_mocked_responses(function(req) {
     env$req <- req
     httr2::response_json(body = list(
-      items = list(list(dataset_id = "ds_1", status = "formatted")), next_cursor = NULL
+      items = list(list(dataset_id = "ds_1", status = "formatted")),
+      next_cursor = NA_character_,
+      has_next_page = FALSE
     ))
   })
   tbl <- vmx_datasets(study = "std_1", client = con)
@@ -28,7 +30,9 @@ test_that("vmx_datasets accepts a vmx_study object", {
   httr2::local_mocked_responses(function(req) {
     env$req <- req
     httr2::response_json(body = list(
-      items = list(list(dataset_id = "ds_1", status = "formatted")), next_cursor = NULL
+      items = list(list(dataset_id = "ds_1", status = "formatted")),
+      next_cursor = NA_character_,
+      has_next_page = FALSE
     ))
   })
   study <- new_vmx_resource(list(study_id = "std_7"), "vmx_study", "study_id")
@@ -42,7 +46,12 @@ test_that("vmx_upload sends config_yaml as inline form text", {
   writeLines("time,conc\n0,1", data_file)
   writeLines(c("version: 2", "datasets: []"), config_file)
 
-  env <- capture_one(list(dataset_id = "ds_1", status = "uploaded"))
+  env <- capture_one(list(
+    dataset_id = "ds_1",
+    treatment_id = "tmt_1",
+    study_id = "std_1",
+    status = "uploaded"
+  ))
   study <- new_vmx_resource(
     list(study_id = "std_1", treatment_id = "tmt_1"),
     "vmx_study",
@@ -56,6 +65,20 @@ test_that("vmx_upload sends config_yaml as inline form text", {
   expect_equal(body$config_yaml, "version: 2\ndatasets: []")
 })
 
+test_that("vmx_upload rejects empty or duplicate file selections", {
+  expect_error(
+    vmx_upload("std_1", character(), treatment = "tmt_1", client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_upload(
+      "std_1", c("same.csv", "same.csv"),
+      treatment = "tmt_1", client = con
+    ),
+    class = "vmx_usage_error"
+  )
+})
+
 test_that("vmx_dataset fetches and types the resource", {
   httr2::local_mocked_responses(list(httr2::response_json(body = list(
     dataset_id = "ds_1", status = "formatted", tags = list(name = "run-A")
@@ -65,10 +88,11 @@ test_that("vmx_dataset fetches and types the resource", {
   expect_equal(vmx_resource_id(ds), "ds_1")
 })
 
-test_that("vmx_dataset_files paginates into a tibble", {
+test_that("vmx_dataset_files returns all files as a tibble", {
   httr2::local_mocked_responses(list(httr2::response_json(body = list(
     items = list(list(tagged_upload_id = "tu_1", name = "conc.csv", size = 42L)),
-    next_cursor = NULL
+    next_cursor = NA_character_,
+    has_next_page = FALSE
   ))))
   tbl <- vmx_dataset_files("ds_1", client = con)
   expect_equal(tbl$name, "conc.csv")
@@ -87,6 +111,18 @@ test_that("vmx_dataset_tags handles no tags", {
   ds <- new_vmx_resource(list(dataset_id = "ds_1", tags = list()),
                          "vmx_dataset", "dataset_id")
   expect_equal(nrow(vmx_dataset_tags(ds)), 0L)
+})
+
+test_that("vmx_dataset_tags rejects malformed values", {
+  ds <- new_vmx_resource(
+    list(dataset_id = "ds_1", tags = list(name = list("nested"))),
+    "vmx_dataset",
+    "dataset_id"
+  )
+  expect_error(
+    vmx_dataset_tags(ds),
+    class = "vmx_response_error"
+  )
 })
 
 test_that("vmx_dataset_cancel posts and returns a prep-status", {
@@ -113,13 +149,22 @@ test_that("vmx_prep_questions builds a tibble from the prompt", {
     dataset_id = "ds_1", status = "awaiting_input",
     prompt = list(message = "Need info", fields = list(
       list(field = "dose_unit", question = "Units?", required = TRUE,
-           options = list("mg", "ug"), format = "enum")
+           options = list("mg", "ug"), format = "enum",
+           referent = "dosing:unit", rationale = "Needed for conversion.",
+           data_preview = list(list(value = 100)),
+           resolution = list(kind = "unit", hint = "Choose the source unit."),
+           default = "mg", group = "dosing")
     ))
   ))))
   q <- vmx_prep_questions("ds_1", client = con)
   expect_equal(q$field, "dose_unit")
   expect_true(q$required)
   expect_equal(q$options[[1]], list("mg", "ug"))
+  expect_equal(q$referent, "dosing:unit")
+  expect_equal(q$resolution_kind, "unit")
+  expect_equal(q$resolution_hint, "Choose the source unit.")
+  expect_equal(q$default[[1]], "mg")
+  expect_equal(q$data_preview[[1]], list(list(value = 100)))
 })
 
 test_that("vmx_prep_questions is empty when no prompt", {
@@ -131,12 +176,46 @@ test_that("vmx_prep_questions is empty when no prompt", {
 
 test_that("vmx_prep_answer posts the answers body", {
   env <- capture_one(list(dataset_id = "ds_1", status = "formatting"))
-  ps <- vmx_prep_answer("ds_1", list(dose_unit = "mg"), client = con)
+  ps <- vmx_prep_answer(
+    "ds_1",
+    list(dose_unit = "mg"),
+    client = con,
+    idempotency_key = "prep-answer-1"
+  )
   expect_s3_class(ps, "vmx_prep_status")
   expect_equal(env$req$body$data$dose_unit, "mg")
+  expect_equal(env$req$body$data$idempotency_key, "prep-answer-1")
   expect_match(env$req$url, "/datasets/ds_1/prep-answers$")
 })
 
 test_that("vmx_prep_answer rejects a non-named answers arg", {
   expect_error(vmx_prep_answer("ds_1", list(1, 2), client = con), class = "vmx_usage_error")
+  expect_error(
+    vmx_prep_answer("ds_1", list(), client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_prep_answer(
+      "ds_1", list(idempotency_key = "not-an-answer"), client = con
+    ),
+    class = "vmx_usage_error"
+  )
+})
+
+test_that("vmx_prep_questions rejects duplicate answer keys", {
+  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+    dataset_id = "ds_1",
+    status = "awaiting_input",
+    prompt = list(
+      message = "Need info",
+      fields = list(
+        list(field = "dose_unit", question = "Units?", required = TRUE),
+        list(field = "dose_unit", question = "Units again?", required = TRUE)
+      )
+    )
+  ))))
+  expect_error(
+    vmx_prep_questions("ds_1", client = con),
+    class = "vmx_response_error"
+  )
 })

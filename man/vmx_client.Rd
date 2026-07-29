@@ -25,7 +25,7 @@ Resolves connection config with the precedence: explicit args ->
 \code{\link[=print]{print()}} and never logged.
 }
 \details{
-When no token is supplied (neither \code{token=} nor \code{VMX_API_TOKEN}), the client
+When no token is supplied (neither \verb{token=} nor \code{VMX_API_TOKEN}), the client
 \strong{auto-authenticates} via OIDC: it reads the token cached by \code{\link[=vmx_login]{vmx_login()}}
 (\verb{~/.config/vmx/oidc-token.json}), refreshing it silently when expired, and
 -- in an interactive session -- running \code{\link[=vmx_login]{vmx_login()}} if there is no usable

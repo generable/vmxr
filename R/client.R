@@ -30,15 +30,24 @@
 #' @return An object of class `vmx_client`.
 #' @export
 vmx_client <- function(base_url = NULL, token = NULL, ...) {
-  base_url <- trimws(base_url %||% Sys.getenv("VMX_API_BASE_URL", unset = ""))
-  token <- trimws(token %||% Sys.getenv("VMX_API_TOKEN", unset = ""))
+  base_url <- base_url %||% Sys.getenv("VMX_API_BASE_URL", unset = "")
+  token <- token %||% Sys.getenv("VMX_API_TOKEN", unset = "")
 
-  if (!nzchar(base_url)) {
+  if (!is.character(base_url) || length(base_url) != 1L ||
+      is.na(base_url) || !nzchar(trimws(base_url))) {
     vmx_abort(
-      "No API base URL. Set `base_url=` or the VMX_API_BASE_URL env var.",
+      "Set `base_url=` or VMX_API_BASE_URL to one non-empty URL.",
       class = "vmx_usage_error"
     )
   }
+  if (!is.character(token) || length(token) != 1L || is.na(token)) {
+    vmx_abort(
+      "`token` / VMX_API_TOKEN must be one string.",
+      class = "vmx_usage_error"
+    )
+  }
+  base_url <- trimws(base_url)
+  token <- trimws(token)
   # Resolve the bearer token via a *provider closure* re-invoked on every request
   # (see vmx_req), not a single string baked in here. A frozen OIDC access token
   # expires a few minutes into a persistent `con` and every later call then 401s

@@ -14,7 +14,7 @@ vmx_datasets(study = NULL, treatment = NULL, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+A tibble containing all matching datasets.
 }
 \description{
 List datasets

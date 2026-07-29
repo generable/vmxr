@@ -4,7 +4,12 @@
 \alias{vmx_studies}
 \title{List studies for a treatment}
 \usage{
-vmx_studies(treatment = NULL, status = NULL, client = vmx_client())
+vmx_studies(
+  treatment = NULL,
+  status = NULL,
+  client = vmx_client(),
+  created_since = NULL
+)
 }
 \arguments{
 \item{treatment}{A treatment id (\code{tmt_...}) or \code{vmx_treatment}; \code{NULL} lists
@@ -13,9 +18,12 @@ across all treatments.}
 \item{status}{Optional status filter.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{created_since}{Optional lower creation-time bound: a
+\code{POSIXct}/\code{Date} or ISO-8601 string.}
 }
 \value{
-A tibble, one row per study.
+A tibble containing all matching studies.
 }
 \description{
 List studies for a treatment

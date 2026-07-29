@@ -21,7 +21,8 @@ vmx_model_build(
 
 \item{time_basis}{Time basis.}
 
-\item{pd_marker}{Optional \code{"GEN_uuid:increasing"} / \code{":decreasing"} string(s).}
+\item{pd_marker}{Optional \code{"GEN_uuid:increasing"} / \code{":decreasing"}
+string(s). \code{NULL} or \code{character(0)} requests a PK-only build.}
 
 \item{covariate}{Optional covariate name(s).}
 
