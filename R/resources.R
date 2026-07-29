@@ -10,6 +10,18 @@
 #' @keywords internal
 #' @noRd
 new_vmx_resource <- function(data, subclass, id_field) {
+  if (!is.list(data) || is.null(names(data)) || anyDuplicated(names(data))) {
+    vmx_abort_response(
+      sprintf("resource <%s> must be a named object.", subclass),
+      field = id_field
+    )
+  }
+  vmx_response_scalar(
+    vmx_response_field(data, id_field, paste0(subclass, ".", id_field)),
+    paste0(subclass, ".", id_field),
+    type = "character",
+    nonempty = TRUE
+  )
   structure(
     data,
     vmx_id_field = id_field,
@@ -22,12 +34,23 @@ new_vmx_resource <- function(data, subclass, id_field) {
 #' @noRd
 vmx_resource_id <- function(x) {
   field <- attr(x, "vmx_id_field")
-  if (!is.null(field) && !is.null(x[[field]])) {
-    return(x[[field]])
+  if (!is.null(field)) {
+    return(vmx_response_scalar(
+      vmx_response_field(x, field, paste0(class(x)[[1]], ".", field)),
+      paste0(class(x)[[1]], ".", field),
+      type = "character",
+      nonempty = TRUE
+    ))
   }
   # Fall back to the first `*_id` element.
   ids <- grep("_id$", names(x), value = TRUE)
-  if (length(ids)) x[[ids[[1]]]] else NULL
+  if (!length(ids)) {
+    vmx_abort_response(
+      sprintf("resource <%s> has no declared identifier.", class(x)[[1]]),
+      field = "id"
+    )
+  }
+  vmx_response_scalar(x[[ids[[1]]]], ids[[1]], type = "character", nonempty = TRUE)
 }
 
 #' Resolve an argument that may be an id string or a vmx resource object
@@ -44,19 +67,49 @@ vmx_resource_id <- function(x) {
 #' @noRd
 vmx_id <- function(x, prefix = NULL, arg = "id") {
   id <- if (inherits(x, "vmx_resource")) vmx_resource_id(x) else x
-  if (!is.character(id) || length(id) != 1L || is.na(id) || !nzchar(id)) {
+  if (!is.character(id) || length(id) != 1L || is.na(id) ||
+      !nzchar(trimws(id))) {
     vmx_abort(
       sprintf("`%s` must be a single id string or a vmx object.", arg),
       class = "vmx_usage_error"
     )
   }
-  if (!is.null(prefix) && !startsWith(id, paste0(prefix, "_"))) {
+  if (!is.null(prefix) &&
+      (!startsWith(id, paste0(prefix, "_")) ||
+        nchar(id) <= nchar(prefix) + 1L)) {
     vmx_abort(
       sprintf("`%s` should be a '%s_*' id, got '%s'.", arg, prefix, id),
       class = "vmx_usage_error"
     )
   }
   id
+}
+
+# Validate a scalar or vector of non-blank strings without silently coercing
+# numbers or other values into API text fields.
+vmx_nonempty_strings <- function(x, arg, exactly_one = FALSE,
+                                 unique = FALSE) {
+  if (is.factor(x)) x <- as.character(x)
+  valid <- is.character(x) && length(x) > 0L && !anyNA(x) &&
+    all(nzchar(trimws(x)))
+  if (!valid || (isTRUE(exactly_one) && length(x) != 1L)) {
+    count <- if (isTRUE(exactly_one)) {
+      "one non-empty string"
+    } else {
+      "one or more non-empty strings"
+    }
+    vmx_abort(
+      sprintf("`%s` must be %s.", arg, count),
+      class = "vmx_usage_error"
+    )
+  }
+  if (isTRUE(unique) && anyDuplicated(x)) {
+    vmx_abort(
+      sprintf("`%s` must not contain duplicates.", arg),
+      class = "vmx_usage_error"
+    )
+  }
+  as.character(x)
 }
 
 #' Convert a `DvTable` envelope (columns + row-objects) into a typed tibble
@@ -66,10 +119,65 @@ vmx_id <- function(x, prefix = NULL, arg = "id") {
 #' @keywords internal
 #' @noRd
 vmx_dvtable_to_tibble <- function(tbl) {
-  cols <- tbl$columns %||% list()
-  rows <- tbl$rows %||% list()
-  names_ <- vapply(cols, function(col) col$name, character(1))
-  data <- lapply(cols, function(col) vmx_coerce_col(lapply(rows, function(r) r[[col$name]]), col$type))
+  cols <- vmx_response_field(tbl, "columns", "data-version table.columns")
+  rows <- vmx_response_field(tbl, "rows", "data-version table.rows")
+  if (!is.list(cols) || !is.null(names(cols)) ||
+      !is.list(rows) || !is.null(names(rows))) {
+    vmx_abort_response(
+      "data-version table 'columns' and 'rows' must be arrays.",
+      field = "columns"
+    )
+  }
+  names_ <- vapply(seq_along(cols), function(i) {
+    col <- cols[[i]]
+    vmx_response_scalar(
+      vmx_response_field(col, "name", sprintf("data-version table.columns[%d].name", i)),
+      sprintf("data-version table.columns[%d].name", i),
+      type = "character",
+      nonempty = TRUE
+    )
+  }, character(1))
+  if (anyDuplicated(names_)) {
+    vmx_abort_response(
+      "data-version table contains duplicate column names.",
+      field = "columns"
+    )
+  }
+  types <- vapply(seq_along(cols), function(i) {
+    type <- vmx_response_scalar(
+      vmx_response_field(cols[[i]], "type", sprintf("data-version table.columns[%d].type", i)),
+      sprintf("data-version table.columns[%d].type", i),
+      type = "character",
+      nonempty = TRUE
+    )
+    if (!type %in% c("string", "number", "integer", "boolean", "categorical")) {
+      vmx_abort_response(
+        "data-version table contains an unknown declared column type.",
+        field = "columns.type"
+      )
+    }
+    type
+  }, character(1))
+  for (i in seq_along(rows)) {
+    row <- rows[[i]]
+    if (!is.list(row) || is.null(names(row)) ||
+        any(!nzchar(names(row))) || anyDuplicated(names(row)) ||
+        !setequal(names(row), names_)) {
+      vmx_abort_response(
+        "data-version table row fields do not exactly match the declared columns.",
+        field = "rows"
+      )
+    }
+  }
+  values <- lapply(seq_along(names_), function(j) {
+    lapply(seq_along(rows), function(i) {
+      row <- rows[[i]]
+      row[[names_[[j]]]]
+    })
+  })
+  data <- lapply(seq_along(cols), function(i) {
+    vmx_coerce_col(values[[i]], types[[i]])
+  })
   out <- tibble::as_tibble(stats::setNames(data, names_))
   attr(out, "columns") <- cols
   out
@@ -80,53 +188,33 @@ vmx_coerce_col <- function(vals, type) {
   is_na <- function(x) is.null(x) || length(x) == 0
   switch(
     type %||% "string",
-    number = ,
-    integer = vapply(vals, function(x) if (is_na(x)) NA_real_ else as.numeric(x), numeric(1)),
-    boolean = vapply(vals, function(x) if (is_na(x)) NA else as.logical(x), logical(1)),
-    vapply(vals, function(x) if (is_na(x)) NA_character_ else as.character(x), character(1))
+    number = vapply(vals, function(x) {
+      if (is_na(x)) return(NA_real_)
+      vmx_response_scalar(x, "data-version table numeric cell", type = "numeric")
+    }, numeric(1)),
+    integer = vapply(vals, function(x) {
+      if (is_na(x)) return(NA_integer_)
+      value <- vmx_response_scalar(
+        x, "data-version table integer cell", type = "numeric"
+      )
+      integer_value <- suppressWarnings(as.integer(value))
+      if (is.na(integer_value) || value != integer_value) {
+        vmx_abort_response(
+          "data-version table integer cell is outside the supported integer range or is not an integer.",
+          field = "rows"
+        )
+      }
+      integer_value
+    }, integer(1)),
+    boolean = vapply(vals, function(x) {
+      if (is_na(x)) return(NA)
+      vmx_response_scalar(x, "data-version table boolean cell", type = "logical")
+    }, logical(1)),
+    vapply(vals, function(x) {
+      if (is_na(x)) return(NA_character_)
+      vmx_response_scalar(x, "data-version table string cell", type = "character")
+    }, character(1))
   )
-}
-
-#' Group the equal-length parallel arrays of a block into a tibble
-#'
-#' Data-driven: columns are the block elements whose length equals the modal
-#' array length (the observation rows); nested / non-conforming elements (e.g.
-#' quantile bands) are returned on the `"extra"` attribute rather than guessed
-#' into columns.
-#' @keywords internal
-#' @noRd
-vmx_columns_to_tibble <- function(block) {
-  if (!is.list(block) || is.null(names(block)) || !length(block)) return(tibble::tibble())
-  col_len <- function(v) {
-    if (is.atomic(v) && !is.null(v)) return(length(v))
-    if (is.list(v) && length(v) && all(vapply(v, function(e) length(e) <= 1, logical(1)))) return(length(v))
-    NA_integer_
-  }
-  lens <- vapply(block, col_len, integer(1))
-  valid <- lens[!is.na(lens) & lens > 0]
-  if (!length(valid)) return(tibble::tibble())
-  modal <- as.integer(names(sort(table(valid), decreasing = TRUE))[[1]])
-  keep <- names(block)[!is.na(lens) & lens == modal]
-  cols <- lapply(keep, function(nm) vmx_simplify_col(block[[nm]]))
-  out <- tibble::as_tibble(stats::setNames(cols, keep))
-  extra <- setdiff(names(block), keep)
-  if (length(extra)) attr(out, "extra") <- block[extra]
-  out
-}
-
-# Coerce an atomic vector or list-of-scalars to a typed vector (NA for nulls).
-vmx_simplify_col <- function(v) {
-  if (is.atomic(v)) return(v)
-  vals <- lapply(v, function(x) if (length(x) == 0) NULL else x[[1]])
-  nonnull <- Filter(Negate(is.null), vals)
-  cls <- if (length(nonnull)) class(nonnull[[1]])[[1]] else "character"
-  if (cls %in% c("numeric", "double", "integer")) {
-    vapply(vals, function(x) if (is.null(x)) NA_real_ else as.numeric(x), numeric(1))
-  } else if (cls == "logical") {
-    vapply(vals, function(x) if (is.null(x)) NA else as.logical(x), logical(1))
-  } else {
-    vapply(vals, function(x) if (is.null(x)) NA_character_ else as.character(x), character(1))
-  }
 }
 
 #' Resolve an optional id argument (`NULL` passes through)
@@ -161,9 +249,56 @@ as_tibble.vmx_resource <- function(x, ...) {
 #' @keywords internal
 #' @noRd
 vmx_items_to_tibble <- function(items) {
+  if (!is.list(items) || !is.null(names(items))) {
+    vmx_abort_response("pagination field 'items' must be an array.", field = "items")
+  }
   if (!length(items)) return(tibble::tibble())
   rows <- lapply(items, vmx_flatten_row)
   vctrs::vec_rbind(!!!rows)
+}
+
+#' Convert one canonical API page into a tibble
+#'
+#' The cursor remains opaque and is attached for the internal paginator to
+#' return unchanged on the next request.
+#' @keywords internal
+#' @noRd
+vmx_page_to_tibble <- function(page, context = "collection response") {
+  if (!is.list(page) || is.null(names(page))) {
+    vmx_abort_response(sprintf("%s must be an object.", context), field = "page")
+  }
+  items <- vmx_response_field(page, "items", paste0(context, ".items"))
+  next_cursor <- vmx_response_field(
+    page, "next_cursor", paste0(context, ".next_cursor"),
+    allow_null = TRUE
+  )
+  if (!is.null(next_cursor)) {
+    next_cursor <- vmx_response_scalar(
+      next_cursor,
+      paste0(context, ".next_cursor"),
+      type = "character",
+      nonempty = TRUE
+    )
+  }
+  has_next_page <- vmx_response_scalar(
+    vmx_response_field(page, "has_next_page", paste0(context, ".has_next_page")),
+    paste0(context, ".has_next_page"),
+    type = "logical"
+  )
+  if (!identical(has_next_page, !is.null(next_cursor))) {
+    vmx_abort_response(
+      sprintf("%s has inconsistent 'has_next_page' and 'next_cursor'.", context),
+      field = "has_next_page"
+    )
+  }
+  out <- vmx_items_to_tibble(items)
+  attr(out, "next_cursor") <- next_cursor
+  attr(out, "has_next_page") <- has_next_page
+  attr(out, "vmx_metadata") <- page[setdiff(
+    names(page),
+    c("items", "next_cursor", "has_next_page")
+  )]
+  out
 }
 
 #' Flatten one resource dict into a single-row tibble
@@ -174,20 +309,139 @@ vmx_items_to_tibble <- function(items) {
 #' @keywords internal
 #' @noRd
 vmx_flatten_row <- function(item) {
+  if (!is.list(item) || is.null(names(item)) || !length(item) ||
+      any(!nzchar(names(item))) || anyDuplicated(names(item))) {
+    vmx_abort_response("collection item must be a named object.", field = "items")
+  }
   flat <- list()
+  put <- function(name, value) {
+    if (name %in% names(flat)) {
+      vmx_abort_response(
+        "collection item contains fields that collide when flattened.",
+        field = name
+      )
+    }
+    flat[[name]] <<- value
+  }
   for (nm in names(item)) {
     val <- item[[nm]]
     if (is.null(val)) {
-      flat[[nm]] <- NA
+      put(nm, NA)
     } else if (is.list(val) && !is.null(names(val)) && length(val)) {
+      if (any(!nzchar(names(val))) || anyDuplicated(names(val))) {
+        vmx_abort_response(
+          "collection item contains an invalid nested object.",
+          field = nm
+        )
+      }
       for (sub in names(val)) {
-        flat[[paste0(nm, "_", sub)]] <- val[[sub]] %||% NA
+        nested <- val[[sub]]
+        put(paste0(nm, "_", sub), if (is.null(nested)) {
+          NA
+        } else if (!is.list(nested) && length(nested) == 1L) {
+          nested
+        } else {
+          list(nested)
+        })
       }
     } else if (length(val) == 1 && !is.list(val)) {
-      flat[[nm]] <- val
+      put(nm, val)
     } else {
-      flat[[nm]] <- list(val)
+      put(nm, list(val))
     }
   }
   tibble::as_tibble(flat)
+}
+
+# ---- Successful-response validation ---------------------------------------
+
+# Pull a required named response field. `allow_null` distinguishes an explicit
+# JSON null from an absent field by checking the object's names first.
+vmx_response_field <- function(x, name, path = name, allow_null = FALSE) {
+  if (!is.list(x) || is.null(names(x)) || anyDuplicated(names(x)) ||
+      !name %in% names(x)) {
+    vmx_abort_response(sprintf("required field '%s' is missing.", path), field = path)
+  }
+  value <- x[[name]]
+  if (is.null(value) && !isTRUE(allow_null)) {
+    vmx_abort_response(sprintf("required field '%s' is null.", path), field = path)
+  }
+  value
+}
+
+# Validate and coerce a JSON scalar without accepting an array and silently
+# taking its first member.
+vmx_response_scalar <- function(x, path, type = c("character", "numeric", "logical"),
+                                nonempty = FALSE) {
+  type <- match.arg(type)
+  if (is.list(x) || length(x) != 1L || is.na(x)) {
+    vmx_abort_response(sprintf("field '%s' must be one %s value.", path, type), field = path)
+  }
+  valid <- switch(
+    type,
+    character = is.character(x),
+    numeric = is.numeric(x) && is.finite(x),
+    logical = is.logical(x)
+  )
+  if (!isTRUE(valid)) {
+    vmx_abort_response(sprintf("field '%s' must be one %s value.", path, type), field = path)
+  }
+  if (isTRUE(nonempty) && type == "character" && !nzchar(trimws(x))) {
+    vmx_abort_response(sprintf("field '%s' must not be blank.", path), field = path)
+  }
+  switch(type, character = as.character(x), numeric = as.numeric(x), logical = as.logical(x))
+}
+
+# Validate and coerce a JSON array of scalars. Nullable arrays retain JSON null
+# cells as typed NA; required estimate arrays reject them.
+vmx_response_vector <- function(x, path, type = c("character", "numeric", "logical"),
+                                size = NULL, nullable = FALSE) {
+  type <- match.arg(type)
+  if (!is.list(x) || !is.null(names(x))) {
+    vmx_abort_response(sprintf("field '%s' must be an array.", path), field = path)
+  }
+  if (!is.null(size) && length(x) != size) {
+    vmx_abort_response(
+      sprintf("field '%s' has length %d; expected %d.", path, length(x), size),
+      field = path
+    )
+  }
+  missing_value <- switch(type, character = NA_character_, numeric = NA_real_, logical = NA)
+  values <- lapply(seq_along(x), function(i) {
+    value <- x[[i]]
+    missing <- is.null(value) || length(value) == 0L ||
+      (!is.list(value) && length(value) == 1L && is.na(value))
+    if (missing) {
+      if (isTRUE(nullable)) return(missing_value)
+      vmx_abort_response(
+        sprintf("field '%s' contains a null value.", path),
+        field = path
+      )
+    }
+    vmx_response_scalar(value, path, type = type)
+  })
+  switch(
+    type,
+    character = vapply(values, identity, character(1)),
+    numeric = vapply(values, identity, numeric(1)),
+    logical = vapply(values, identity, logical(1))
+  )
+}
+
+# Verify that a response belongs to the resource requested by the caller before
+# associating or reshaping its data.
+vmx_validate_response_id <- function(x, field, expected, context) {
+  actual <- vmx_response_scalar(
+    vmx_response_field(x, field, paste0(context, ".", field)),
+    paste0(context, ".", field),
+    type = "character",
+    nonempty = TRUE
+  )
+  if (!identical(actual, expected)) {
+    vmx_abort_response(
+      sprintf("%s field '%s' does not match the requested resource.", context, field),
+      field = field
+    )
+  }
+  invisible(actual)
 }

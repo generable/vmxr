@@ -10,16 +10,33 @@ vmx_model_fits(
   model_type = NULL,
   marker_name = NULL,
   status = NULL,
-  client = vmx_client()
+  client = vmx_client(),
+  treatment = NULL,
+  study = NULL,
+  source_pk_model_fit = NULL
 )
 }
 \arguments{
-\item{run, data_version, model_type, marker_name, status}{Optional filters.}
+\item{run}{Optional model-build run filter.}
+
+\item{data_version}{Optional data-version filter.}
+
+\item{model_type}{Optional model-type filter.}
+
+\item{marker_name}{Optional marker-name filter.}
+
+\item{status}{Optional model-fit status filter.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{treatment}{Optional treatment filter.}
+
+\item{study}{Optional study filter.}
+
+\item{source_pk_model_fit}{Optional source PK model-fit filter.}
 }
 \value{
-A tibble.
+A tibble containing all matching model fits.
 }
 \description{
 List model fits

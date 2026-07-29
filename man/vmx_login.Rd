@@ -26,7 +26,7 @@ Invisibly, the cached token (a list; the access/refresh tokens are
 secret and never printed).
 }
 \description{
-Runs the OIDC device-code flow (RFC 8628, via \code{\link[httr2:oauth_flow_device]{httr2::oauth_flow_device()}})
+Runs the OIDC device-code flow (RFC 8628, via \code{\link[httr2:req_oauth_device]{httr2::oauth_flow_device()}})
 against the workspace's Authentik provider and caches the resulting token so
 later \code{\link[=vmx_client]{vmx_client()}} calls authenticate automatically. Endpoints are resolved
 from the issuer's \code{.well-known/openid-configuration} discovery document; the
@@ -38,12 +38,11 @@ The token is written as plain JSON to \verb{~/.config/vmx/oidc-token.json} (the
 same path and shape the \code{vmx} CLI uses, with \code{0600} permissions), so one
 \code{vmx_login()} serves both R and the terminal CLI and the session survives a
 fresh R process or workspace pod restart. Because the refresh token is
-persisted on the home PVC, you log in \strong{once per refresh-token lifetime}
-(~30 days).
+persisted on the home PVC, you log in once per provider-configured
+refresh-token lifetime.
 
 Configuration is read from environment variables (matching the CLI):
 \code{VMX_OIDC_ISSUER}, \code{VMX_OIDC_CLIENT_ID}, and optionally \code{VMX_OIDC_SCOPES}.
-Confirmed-working staging values: issuer
-\code{https://auth.staging.gnrbl.co/application/o/generable-staging-vmx-cli/},
-client id \code{generable-staging-vmx-cli}.
+Workspace deployments provision the issuer and client id; vmxr does not
+assume values from a different workspace or environment.
 }

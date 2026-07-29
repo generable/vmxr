@@ -8,7 +8,7 @@
 #'   `degraded`/`failed`).
 #' @param time_basis Optional time-basis filter.
 #' @param client A `vmx_client`.
-#' @return A tibble, one row per analysis.
+#' @return A tibble containing all matching analyses.
 #' @export
 vmx_nca_analyses <- function(data_version = NULL, study = NULL, treatment = NULL,
                              status = NULL, time_basis = NULL,
@@ -20,7 +20,7 @@ vmx_nca_analyses <- function(data_version = NULL, study = NULL, treatment = NULL
     status = status,
     time_basis = time_basis
   )
-  vmx_items_to_tibble(vmx_paginate(client, "/nca-analyses", params))
+  vmx_paginate(client, "/nca-analyses", params)
 }
 
 #' Run an NCA analysis
@@ -42,14 +42,23 @@ vmx_nca_analyses <- function(data_version = NULL, study = NULL, treatment = NULL
 vmx_nca <- function(data_version, time_basis, idempotency_key = NULL,
                     retried_from = NULL, wait = TRUE, ...,
                     client = vmx_client()) {
+  time_basis <- vmx_nonempty_strings(
+    time_basis, "time_basis", exactly_one = TRUE
+  )
+  if (!is.null(idempotency_key)) {
+    vmx_id_like_scalar(idempotency_key, "idempotency_key")
+  }
   body <- vmx_compact(list(
     data_version_id = vmx_id(data_version, "dv", "data_version"),
     time_basis = time_basis,
     idempotency_key = idempotency_key,
-    retried_from = retried_from
+    retried_from = vmx_opt_id(retried_from, "nca", "retried_from")
   ))
-  nca <- new_vmx_resource(vmx_post(client, "/nca-analyses", body),
-                          "vmx_nca_analysis", "nca_id")
+  data <- vmx_post(client, "/nca-analyses", body)
+  vmx_validate_response_id(
+    data, "data_version_id", body$data_version_id, "NCA creation"
+  )
+  nca <- new_vmx_resource(data, "vmx_nca_analysis", "nca_id")
   if (isTRUE(wait)) vmx_wait(nca, client = client, ...) else nca
 }
 
@@ -59,7 +68,9 @@ vmx_nca <- function(data_version, time_basis, idempotency_key = NULL,
 #' @return A `vmx_nca_analysis`.
 #' @export
 vmx_nca_get <- function(id, client = vmx_client()) {
-  data <- vmx_get(client, paste0("/nca-analyses/", vmx_id(id, "nca")))
+  nca_id <- vmx_id(id, "nca")
+  data <- vmx_get(client, paste0("/nca-analyses/", nca_id))
+  vmx_validate_response_id(data, "nca_id", nca_id, "NCA analysis")
   new_vmx_resource(data, "vmx_nca_analysis", "nca_id")
 }
 
@@ -75,27 +86,69 @@ vmx_nca_get <- function(id, client = vmx_client()) {
 #' @return A tibble.
 #' @export
 vmx_nca_result <- function(nca, client = vmx_client()) {
-  res <- vmx_get(client, paste0("/nca-analyses/", vmx_id(nca, "nca"), "/result"))
-  cols <- list(
-    subject_id = vmx_chr(res$subject_id),
-    gen_subject_uuid = vmx_chr(res$gen_subject_uuid)
+  nca_id <- vmx_id(nca, "nca")
+  res <- vmx_get(client, paste0("/nca-analyses/", nca_id, "/result"))
+  vmx_validate_response_id(res, "nca_id", nca_id, "NCA result")
+  gen_subject_uuid <- vmx_response_vector(
+    vmx_response_field(res, "gen_subject_uuid", "NCA result.gen_subject_uuid"),
+    "NCA result.gen_subject_uuid",
+    type = "character"
   )
-  for (metric in names(res$point_estimates)) {
-    cols[[metric]] <- vmx_num(res$point_estimates[[metric]])
+  if (anyDuplicated(gen_subject_uuid)) {
+    vmx_abort_response(
+      "field 'NCA result.gen_subject_uuid' contains duplicate subject keys.",
+      field = "gen_subject_uuid"
+    )
+  }
+  n <- length(gen_subject_uuid)
+  subject_id <- vmx_response_vector(
+    vmx_response_field(res, "subject_id", "NCA result.subject_id"),
+    "NCA result.subject_id",
+    type = "character",
+    size = n
+  )
+  estimates <- vmx_response_field(res, "point_estimates", "NCA result.point_estimates")
+  if (!is.list(estimates) || is.null(names(estimates)) ||
+      any(!nzchar(names(estimates))) || anyDuplicated(names(estimates))) {
+    vmx_abort_response(
+      "field 'NCA result.point_estimates' must be an object.",
+      field = "point_estimates"
+    )
+  }
+  reserved <- intersect(
+    names(estimates), c("subject_id", "gen_subject_uuid")
+  )
+  if (length(reserved)) {
+    vmx_abort_response(
+      "NCA metric name conflicts with a subject-identity column.",
+      field = paste0("point_estimates.", reserved[[1]])
+    )
+  }
+  cols <- list(
+    subject_id = subject_id,
+    gen_subject_uuid = gen_subject_uuid
+  )
+  for (metric in names(estimates)) {
+    cols[[metric]] <- vmx_response_vector(
+      estimates[[metric]],
+      paste0("NCA result.point_estimates.", metric),
+      type = "numeric",
+      size = n,
+      nullable = TRUE
+    )
   }
   out <- tibble::as_tibble(cols)
-  attr(out, "quantities") <- res$quantities
+  metadata <- res[setdiff(
+    names(res),
+    c("gen_subject_uuid", "subject_id", "point_estimates")
+  )]
+  attr(out, "vmx_metadata") <- metadata
+  for (name in c(
+    "nca_id", "data_version_id", "status", "time_basis", "units",
+    "quantities", "excluded_subjects", "worker_version", "trigger_source",
+    "retried_from"
+  )) {
+    if (name %in% names(res)) attr(out, name) <- res[[name]]
+  }
   out
-}
-
-# Coerce a parsed JSON array (list of scalars, possibly with JSON nulls) to a
-# vector. A null parses to NULL or an empty list depending on the encoder, so
-# treat any length-0 element as a missing value.
-vmx_chr <- function(x) {
-  if (!length(x)) return(character(0))
-  vapply(x, function(v) if (length(v) == 0) NA_character_ else as.character(v[[1]]), character(1))
-}
-vmx_num <- function(x) {
-  if (!length(x)) return(numeric(0))
-  vapply(x, function(v) if (length(v) == 0) NA_real_ else as.numeric(v[[1]]), numeric(1))
 }

@@ -6,7 +6,7 @@
 #' @param include_archived Include archived versions.
 #' @param eligible_for_modeling Optional modeling-eligibility filter.
 #' @param client A `vmx_client`.
-#' @return A tibble.
+#' @return A tibble containing all matching data versions.
 #' @export
 vmx_data_versions <- function(treatment = NULL, study = NULL,
                               include_archived = FALSE,
@@ -18,7 +18,7 @@ vmx_data_versions <- function(treatment = NULL, study = NULL,
     include_archived = include_archived,
     eligible_for_modeling = eligible_for_modeling
   )
-  vmx_items_to_tibble(vmx_paginate(client, "/data-versions", params))
+  vmx_paginate(client, "/data-versions", params)
 }
 
 #' Fetch one data version
@@ -27,7 +27,11 @@ vmx_data_versions <- function(treatment = NULL, study = NULL,
 #' @return A `vmx_data_version`.
 #' @export
 vmx_data_version <- function(id, client = vmx_client()) {
-  data <- vmx_get(client, paste0("/data-versions/", vmx_id(id, "dv")))
+  data_version_id <- vmx_id(id, "dv")
+  data <- vmx_get(client, paste0("/data-versions/", data_version_id))
+  vmx_validate_response_id(
+    data, "data_version_id", data_version_id, "data version"
+  )
   new_vmx_resource(data, "vmx_data_version", "data_version_id")
 }
 
@@ -46,12 +50,29 @@ vmx_data_version <- function(id, client = vmx_client()) {
 #' @export
 vmx_data_version_create <- function(dataset, uploads, prior_config = NULL,
                                     client = vmx_client()) {
+  dataset_id <- vmx_id(dataset, "ds", "dataset")
+  uploads <- vmx_nonempty_strings(
+    uploads, "uploads", unique = TRUE
+  )
+  upload_ids <- vapply(
+    uploads,
+    vmx_id,
+    character(1),
+    prefix = "upl",
+    arg = "uploads"
+  ) |> unname()
   body <- vmx_compact(list(
-    upload_ids = as.list(uploads),
+    upload_ids = as.list(upload_ids),
     prior_config_data_version_id = vmx_opt_id(prior_config, "dv", "prior_config")
   ))
-  data <- vmx_post(client, paste0("/datasets/", vmx_id(dataset, "ds", "dataset"),
-                                  "/data-versions"), body)
+  data <- vmx_post(
+    client,
+    paste0("/datasets/", dataset_id, "/data-versions"),
+    body
+  )
+  vmx_validate_response_id(
+    data, "dataset_id", dataset_id, "data-version creation"
+  )
   new_vmx_resource(data, "vmx_prep_status", "dataset_id")
 }
 
@@ -71,7 +92,21 @@ vmx_data_version_create <- function(dataset, uploads, prior_config = NULL,
 vmx_data_version_table <- function(dv, domain = c("subjects", "pk", "dosing", "pd", "labs", "covariates"),
                                    client = vmx_client()) {
   domain <- match.arg(domain)
-  tbl <- vmx_get(client, paste0("/data-versions/", vmx_id(dv, "dv"), "/tables/", domain))
+  dv_id <- vmx_id(dv, "dv")
+  tbl <- vmx_get(client, paste0("/data-versions/", dv_id, "/tables/", domain))
+  vmx_validate_response_id(tbl, "data_version_id", dv_id, "data-version table")
+  returned_domain <- vmx_response_scalar(
+    vmx_response_field(tbl, "domain", "data-version table.domain"),
+    "data-version table.domain",
+    type = "character",
+    nonempty = TRUE
+  )
+  if (!identical(returned_domain, domain)) {
+    vmx_abort_response(
+      "data-version table field 'domain' does not match the requested domain.",
+      field = "domain"
+    )
+  }
   vmx_dvtable_to_tibble(tbl)
 }
 
@@ -87,18 +122,46 @@ vmx_data_version_table <- function(dv, domain = c("subjects", "pk", "dosing", "p
 #' @return The export envelope (list), or, when `dest` is set, `dest` invisibly.
 #' @export
 vmx_data_version_export <- function(dv, dest = NULL, client = vmx_client()) {
-  envelope <- vmx_get(client, paste0("/data-versions/", vmx_id(dv, "dv"), "/export"))
+  data_version_id <- vmx_id(dv, "dv")
+  envelope <- vmx_get(
+    client, paste0("/data-versions/", data_version_id, "/export")
+  )
+  vmx_validate_response_id(
+    envelope, "data_version_id", data_version_id, "data-version export"
+  )
+  url <- vmx_response_scalar(
+    vmx_response_field(
+      envelope, "download_url", "data-version export.download_url"
+    ),
+    "data-version export.download_url",
+    type = "character",
+    nonempty = TRUE
+  )
   if (is.null(dest)) {
     return(envelope)
   }
-  url <- envelope$download_url %||% envelope$url
-  if (is.null(url)) {
-    vmx_abort("Export envelope did not contain a download URL.", class = "vmx_api_error")
+  if (!is.character(dest) || length(dest) != 1L || is.na(dest) ||
+      !nzchar(trimws(dest))) {
+    vmx_abort(
+      "`dest` must be one non-empty file path.",
+      class = "vmx_usage_error"
+    )
   }
   # Anonymous request: the signed URL carries its own credentials; sending the
   # API bearer to GCS would leak the token and is rejected anyway.
-  httr2::request(url) |>
-    httr2::req_perform(path = dest)
+  tryCatch(
+    httr2::request(url) |>
+      httr2::req_perform(path = dest),
+    error = function(e) {
+      # Do not attach the transport condition: it may contain the signed URL
+      # (and therefore its temporary credentials).
+      vmx_abort(
+        "Data-version export download failed.",
+        class = "vmx_api_error",
+        reason = "export_download_failed"
+      )
+    }
+  )
   invisible(dest)
 }
 
@@ -125,7 +188,13 @@ vmx_data_version_unarchive <- function(dv, client = vmx_client()) {
 #' @noRd
 vmx_set_dv_archive <- function(dv, archived, reason, client) {
   body <- vmx_compact(list(archived = archived, reason = reason))
-  data <- vmx_patch(client, paste0("/data-versions/", vmx_id(dv, "dv"), "/archive"), body)
+  data_version_id <- vmx_id(dv, "dv")
+  data <- vmx_patch(
+    client, paste0("/data-versions/", data_version_id, "/archive"), body
+  )
+  vmx_validate_response_id(
+    data, "data_version_id", data_version_id, "data-version archive update"
+  )
   new_vmx_resource(data, "vmx_data_version", "data_version_id")
 }
 
@@ -140,13 +209,22 @@ vmx_subjects <- function(dv, client = vmx_client()) {
   vmx_data_version_table(dv, "subjects", client = client)
 }
 
-#' PK observations + events table
+#' PK observations table
 #' @param dv A data-version id or `vmx_data_version`.
 #' @param client A `vmx_client`.
 #' @return A tibble.
 #' @export
 vmx_pk <- function(dv, client = vmx_client()) {
   vmx_data_version_table(dv, "pk", client = client)
+}
+
+#' Dosing events table
+#' @param dv A data-version id or `vmx_data_version`.
+#' @param client A `vmx_client`.
+#' @return A tibble.
+#' @export
+vmx_dosing <- function(dv, client = vmx_client()) {
+  vmx_data_version_table(dv, "dosing", client = client)
 }
 
 #' PD observations table
@@ -160,11 +238,11 @@ vmx_pd <- function(dv, client = vmx_client()) {
 
 #' Fetch model-ready tidy tables for a data version
 #'
-#' Returns a `vmx_model_data` bundle with `$subjects`, `$pk`, `$pd` (each a
-#' tibble, or `NULL` when the DataVersion has no such prepared table), and
-#' `$meta` (units, time bases, PD-marker manifest, subject count) read from the
-#' DataVersion. Only domains flagged in the DV's `table_availability` are
-#' fetched, so absent optional tables don't 404.
+#' Returns a `vmx_model_data` bundle with `$subjects`, `$pk`, `$dosing`, and
+#' `$pd` (each a tibble, or `NULL` when the DataVersion has no such prepared
+#' table), and `$meta` (units, time bases, PD-marker manifest, subject count)
+#' read from the DataVersion. Only domains flagged in the DV's
+#' `table_availability` are fetched, so absent optional tables don't 404.
 #'
 #' @param dv A data-version id or `vmx_data_version`.
 #' @param client A `vmx_client`.
@@ -172,7 +250,7 @@ vmx_pd <- function(dv, client = vmx_client()) {
 #' @export
 vmx_model_data <- function(dv, client = vmx_client()) {
   dv_obj <- if (inherits(dv, "vmx_data_version")) dv else vmx_data_version(vmx_id(dv, "dv"), client = client)
-  avail <- dv_obj$table_availability %||% list()
+  avail <- vmx_table_availability(dv_obj)
   fetch <- function(domain) {
     if (isTRUE(avail[[domain]])) vmx_data_version_table(dv_obj, domain, client = client) else NULL
   }
@@ -180,6 +258,7 @@ vmx_model_data <- function(dv, client = vmx_client()) {
     list(
       subjects = fetch("subjects"),
       pk = fetch("pk"),
+      dosing = fetch("dosing"),
       pd = fetch("pd"),
       meta = list(
         data_version_id = dv_obj$data_version_id,
@@ -195,6 +274,29 @@ vmx_model_data <- function(dv, client = vmx_client()) {
   )
 }
 
+vmx_table_availability <- function(dv) {
+  avail <- vmx_response_field(
+    dv, "table_availability", "data version.table_availability"
+  )
+  required <- c("subjects", "pk", "dosing", "pd", "labs", "covariates")
+  if (!is.list(avail) || is.null(names(avail)) ||
+      any(!nzchar(names(avail))) || anyDuplicated(names(avail)) ||
+      !all(required %in% names(avail))) {
+    vmx_abort_response(
+      "field 'data version.table_availability' is missing required domains.",
+      field = "table_availability"
+    )
+  }
+  for (domain in names(avail)) {
+    vmx_response_scalar(
+      avail[[domain]],
+      paste0("data version.table_availability.", domain),
+      type = "logical"
+    )
+  }
+  avail
+}
+
 #' @export
 print.vmx_model_data <- function(x, ...) {
   cli::cli_text("{.cls <vmx_model_data>} {x$meta$data_version_id %||% ''}")
@@ -202,6 +304,7 @@ print.vmx_model_data <- function(x, ...) {
   cli::cli_bullets(c(
     "*" = "subjects: {dims(x$subjects)}",
     "*" = "pk: {dims(x$pk)}",
+    "*" = "dosing: {dims(x$dosing)}",
     "*" = "pd: {dims(x$pd)}"
   ))
   invisible(x)

@@ -12,7 +12,7 @@ vmx_sim_jobs(fit, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+A tibble containing all simulation jobs for the fit.
 }
 \description{
 List simulation jobs for a model fit

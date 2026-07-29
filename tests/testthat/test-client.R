@@ -15,6 +15,23 @@ test_that("vmx_client errors without a base_url", {
   expect_error(vmx_client(), class = "vmx_usage_error")
 })
 
+test_that("vmx_client rejects ambiguous connection values", {
+  expect_error(
+    vmx_client(
+      base_url = c("https://one.test", "https://two.test"),
+      token = "pat"
+    ),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_client(
+      base_url = "https://example.test",
+      token = c("one", "two")
+    ),
+    class = "vmx_usage_error"
+  )
+})
+
 test_that("vmx_client errors without a token", {
   withr::local_envvar(VMX_API_TOKEN = "")
   expect_error(

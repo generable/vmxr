@@ -18,7 +18,7 @@ vmx_model_build_runs(
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+A tibble containing all matching model-build runs.
 }
 \description{
 List model build runs

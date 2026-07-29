@@ -1,6 +1,7 @@
 # VeloMetrix R client — design proposal
 
-**Status:** accepted — package scaffolded in this repo (`generable/vmxr`)
+**Status:** historical design record — package implemented in this repo
+(`generable/vmxr`)
 **Author:** (proposed)
 **Related:** [vmx-services `clients/cli/`](https://github.com/generable/vmx-services/tree/main/clients/cli), [vmx-services PR #198](https://github.com/generable/vmx-services/pull/198)
 
@@ -13,6 +14,10 @@
 > review; where they still say "recommend `clients/r/`" read them as the
 > rejected alternative, with §2's reviewer note as the rationale for the
 > standalone choice.
+>
+> This document records the original proposal and is not the current API
+> reference. The package function documentation and README describe shipped
+> behavior; the authoritative wire semantics live in `vmx-contracts`.
 
 ## 1. Motivation
 
@@ -36,7 +41,7 @@ workflow inside the R session next to the user's data.
 
 - First-class R client covering the full analysis workflow (treatments →
   studies → datasets → data-versions → NCA → modeling → simulation).
-- Ergonomic, pipe-friendly verbs that hide async polling and pagination.
+- Ergonomic, pipe-friendly verbs that hide async polling and cursor pagination.
 - Native return types: tibbles for collections, typed S3 objects for resources.
 - One auth model, identical to the CLI (`VMX_API_TOKEN` Authentik PAT).
 - **No business logic** — the API stays the single source of truth; the client
@@ -167,8 +172,9 @@ clients/r/
   (`op_datasets_upload()`, `op_treatments_list()`, …). Mechanical: build request,
   send, parse JSON to a list, surface HTTP errors. Regenerated whenever
   `openapi.json` changes. Users normally never call these directly.
-- **Ergonomic (`R/*.R`)** — the curated public API. Adds polling, pagination,
-  multipart upload, tibble/S3 conversion, and the workflow verbs. This layer is
+- **Ergonomic (`R/*.R`)** — the curated public API. Adds polling, automatic
+  cursor pagination, multipart upload, tibble/S3 conversion, and the
+  workflow verbs. This layer is
   small, stable, and is what the docs and vignettes teach.
 
 > **Codegen caveat (decide early).** The API emits **OpenAPI 3.1**. R generator
@@ -221,13 +227,14 @@ in the object but **redacted in `print()`** and never logged.
   (`"ds_…"`) or the S3 object returned by a prior call. ID prefixes are
   validated client-side (matching the CLI's fail-fast behavior).
 - **Return types:**
-  - Collection endpoints → **tibble** (one row per item; list-columns for nested
-    fields), auto-paginated across `next_cursor` by default.
+  - Collection endpoints → **tibble** containing all matching rows (one row per
+    item; list-columns for nested fields), with opaque server cursors followed
+    automatically.
   - Single resource → typed **S3 object** (`vmx_treatment`, `vmx_dataset`,
     `vmx_data_version`, `vmx_nca_analysis`, …) with `print`/`format`/`as_tibble`
     methods.
-  - Raw escape hatch: every verb takes `.raw = TRUE` to return the parsed list
-    untouched.
+  - Nested artifact endpoints return their parsed list shape unchanged where a
+    stable tidy projection is not defined.
 - **Async:** any verb that kicks off server work returns immediately with a
   handle; `vmx_wait()` blocks and polls. Convenience verbs (`vmx_*_sync()` or a
   `wait = TRUE` arg) do both.
@@ -293,7 +300,7 @@ vmx_prep_status(dataset, client = vmx_client())   # -> vmx_prep_status (state, d
 # dataset, data-version, model-build-run, simulation-job.
 vmx_wait(x,
          until    = NULL,          # target terminal state(s); sensible default per type
-         timeout  = 900,           # seconds
+         timeout  = 900,           # methods use worker-aligned defaults
          interval = 5,
          progress = interactive(), # show a CLI progress bar
          client   = vmx_client())  # -> updated object, or vmx_timeout_error
@@ -333,10 +340,11 @@ ecosystem adapters are where the convenience lives.
 #### Tidy accessors
 
 ```r
-# One fetch -> three tidy tables + the metadata modelers need
-md <- vmx_model_data(dv)          # vmx_model_data: $subjects $pk $pd $meta
+# One call -> available tidy tables + the metadata modelers need
+md <- vmx_model_data(dv)          # $subjects $pk $dosing $pd $meta
 md$subjects   # one row/subject: id, covariates (WT, AGE, SEX, CRCL, ...)
-md$pk         # long obs+events: id, time, dv, amt, evid, cmt, mdv, rate, blq, lloq, analyte
+md$pk         # PK observations
+md$dosing     # dosing events
 md$pd         # long: id, time, dv, marker (GEN_uuid -> name), ...
 md$meta       # units, lloq, time_basis, analyte/marker manifest, id map, dv hash
 
@@ -393,8 +401,7 @@ gets wrong. Build it once, correctly.
 #### API support this assumes
 
 - **Separate typed sub-table endpoints** rather than one flat table:
-  `GET /data-versions/{id}/{subjects|pk|pd}` with server-side filtering (by
-  analyte/marker/subject), pagination, and **Arrow/Parquet content negotiation**.
+  `GET /data-versions/{id}/tables/{subjects|pk|dosing|pd|labs|covariates}`.
 - **A manifest** on the DataVersion: analytes, PD markers (`GEN_uuid` → human
   name), units, LLOQ, compartment map, dose routes, available time bases — the
   adapters read this to assemble correct `CMT`/`RATE`/censoring without guessing.

@@ -18,6 +18,6 @@ A list (the parsed result).
 }
 \description{
 \code{GET /simulation-jobs/{id}/result}. Returns the parsed result payload
-(subject/time series with prediction bands). Tibble reshaping is deferred
-pending confirmation of the artifact shape; see the package NEWS.
+containing model-implied response trajectories with the server-provided
+point statistic and interval. The nested wire shape is retained verbatim.
 }

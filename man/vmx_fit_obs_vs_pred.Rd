@@ -15,9 +15,9 @@ vmx_fit_obs_vs_pred(fit, client = vmx_client())
 A tibble (one row per PK observation).
 }
 \description{
-Reshapes the \code{pk} block's parallel observation arrays (subject ids, time,
-observed concentration, BLQ/ALOQ flags, LLOQ, …) into a one-row-per-
-observation tibble. Non-columnar members — notably the predicted-
-concentration quantile bands — are kept on the \code{"extra"} attribute; the PD
-block is on \code{"pd"} and the fit id on \code{"model_fit_id"}.
+Reshapes the PK block into one row per observation. The returned prediction
+columns retain the server-selected point statistic and interval semantics.
+A named list of equivalently reshaped PD-marker tibbles is attached as the
+\code{"pd_markers"} attribute; units and marker references remain attributes on
+their respective tibbles.
 }

@@ -12,7 +12,7 @@ vmx_dataset_files(dataset, client = vmx_client())
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+A tibble containing all files in the dataset.
 }
 \description{
 List the files in a dataset
