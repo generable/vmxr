@@ -83,17 +83,38 @@ vmx_data_version_create <- function(dataset, uploads, prior_config = NULL,
 #' which is attached as the `"columns"` attribute). `gen_subject_uuid` is the
 #' canonical subject join key.
 #'
+#' API 0.3 projects every analytical table on a time basis and requires the
+#' `time_basis` query parameter. When `time_basis` is `NULL`, the
+#' DataVersion's recommended basis is used (fetching the DataVersion first if
+#' only an id was given). A v0.3 DataVersion with no recommended basis (no
+#' basis has PK-eligible subjects) needs an explicit `time_basis`; only a
+#' DataVersion without a `time_bases` map (an API 0.2 server) is fetched
+#' without the parameter.
+#'
 #' @param dv A data-version id (`dv_...`) or `vmx_data_version`.
 #' @param domain One of `"subjects"`, `"pk"`, `"dosing"`, `"pd"`, `"labs"`,
 #'   `"covariates"`.
+#' @param time_basis Optional time basis name (e.g. `"observed"`). A basis the
+#'   DataVersion does not list as available is refused client-side. Passing it
+#'   with a bare id skips the DataVersion fetch, so the availability check and
+#'   the requirement that a v0.3 server echo the basis then rely on the server.
 #' @param client A `vmx_client`.
-#' @return A tibble.
+#' @return A tibble. The selected basis is attached as the `"time_basis"`
+#'   attribute when one was requested or echoed.
 #' @export
 vmx_data_version_table <- function(dv, domain = c("subjects", "pk", "dosing", "pd", "labs", "covariates"),
-                                   client = vmx_client()) {
+                                   time_basis = NULL, client = vmx_client()) {
   domain <- match.arg(domain)
   dv_id <- vmx_id(dv, "dv")
-  tbl <- vmx_get(client, paste0("/data-versions/", dv_id, "/tables/", domain))
+  if (is.null(time_basis) && !inherits(dv, "vmx_data_version")) {
+    dv <- vmx_data_version(dv_id, client = client)
+  }
+  basis <- vmx_resolve_time_basis(dv, time_basis)
+  tbl <- vmx_get(
+    client,
+    paste0("/data-versions/", dv_id, "/tables/", domain),
+    list(time_basis = basis)
+  )
   vmx_validate_response_id(tbl, "data_version_id", dv_id, "data-version table")
   returned_domain <- vmx_response_scalar(
     vmx_response_field(tbl, "domain", "data-version table.domain"),
@@ -107,7 +128,79 @@ vmx_data_version_table <- function(dv, domain = c("subjects", "pk", "dosing", "p
       field = "domain"
     )
   }
-  vmx_dvtable_to_tibble(tbl)
+  echoed <- tbl[["time_basis"]]
+  if (!is.null(basis)) {
+    if (is.null(echoed) && vmx_dv_has_time_bases(dv)) {
+      vmx_abort_response(
+        "data-version table did not echo the requested 'time_basis'.",
+        field = "time_basis"
+      )
+    }
+    if (!is.null(echoed) && !identical(echoed, basis)) {
+      vmx_abort_response(
+        "data-version table field 'time_basis' does not match the requested basis.",
+        field = "time_basis"
+      )
+    }
+  }
+  out <- vmx_dvtable_to_tibble(tbl)
+  attr(out, "time_basis") <- echoed %||% basis
+  out
+}
+
+# TRUE when the DataVersion carries the v0.3 per-basis map (a named, non-empty
+# `time_bases` object) — the marker that time-basis projection is in force.
+vmx_dv_has_time_bases <- function(dv) {
+  bases <- if (inherits(dv, "vmx_resource")) dv$time_bases else NULL
+  is.list(bases) && length(bases) > 0L && !is.null(names(bases))
+}
+
+#' Resolve the time basis to request for a DataVersion's tables
+#'
+#' An explicit `time_basis` wins and is checked against the DataVersion's
+#' `time_bases` map when one is present (an unlisted or unavailable basis is a
+#' usage error). Otherwise the recommended basis is used — API 0.3 serves it
+#' as `{value, reason}`, older servers as a bare string — and `NULL` means the
+#' DataVersion advertises none.
+#' @keywords internal
+#' @noRd
+vmx_resolve_time_basis <- function(dv, time_basis = NULL) {
+  bases <- if (inherits(dv, "vmx_resource")) dv$time_bases else NULL
+  if (!is.null(time_basis)) {
+    time_basis <- vmx_nonempty_strings(time_basis, "time_basis", exactly_one = TRUE)
+    if (is.list(bases) && length(bases) && !is.null(names(bases))) {
+      entry <- bases[[time_basis]]
+      # v0.3 serves an object per basis; the pre-0.3 shape was a bare boolean.
+      is_available <- function(b) (is.list(b) && isTRUE(b$available)) || isTRUE(b)
+      if (is.null(entry) || !is_available(entry)) {
+        available <- names(Filter(is_available, bases))
+        vmx_abort(
+          sprintf(
+            "Time basis '%s' is not available on this DataVersion (available: %s).",
+            time_basis,
+            if (length(available)) paste(available, collapse = ", ") else "none"
+          ),
+          class = "vmx_usage_error"
+        )
+      }
+    }
+    return(time_basis)
+  }
+  if (!inherits(dv, "vmx_resource")) return(NULL)
+  rec <- dv$recommended_time_basis
+  if (is.list(rec)) rec <- rec$value
+  if (is.character(rec) && length(rec) == 1L && !is.na(rec) && nzchar(rec)) return(rec)
+  if (vmx_dv_has_time_bases(dv)) {
+    available <- names(Filter(function(b) (is.list(b) && isTRUE(b$available)) || isTRUE(b), bases))
+    vmx_abort(
+      sprintf(
+        "This DataVersion recommends no time basis (no basis has PK-eligible subjects); pass `time_basis` explicitly to review it (available: %s).",
+        if (length(available)) paste(available, collapse = ", ") else "none"
+      ),
+      class = "vmx_usage_error"
+    )
+  }
+  NULL
 }
 
 #' Export a data version
@@ -202,57 +295,69 @@ vmx_set_dv_archive <- function(dv, archived, reason, client) {
 
 #' Subjects table (one row per subject)
 #' @param dv A data-version id or `vmx_data_version`.
+#' @param time_basis Optional time basis; see [vmx_data_version_table()].
 #' @param client A `vmx_client`.
 #' @return A tibble.
 #' @export
-vmx_subjects <- function(dv, client = vmx_client()) {
-  vmx_data_version_table(dv, "subjects", client = client)
+vmx_subjects <- function(dv, time_basis = NULL, client = vmx_client()) {
+  vmx_data_version_table(dv, "subjects", time_basis = time_basis, client = client)
 }
 
 #' PK observations table
 #' @param dv A data-version id or `vmx_data_version`.
+#' @param time_basis Optional time basis; see [vmx_data_version_table()].
 #' @param client A `vmx_client`.
 #' @return A tibble.
 #' @export
-vmx_pk <- function(dv, client = vmx_client()) {
-  vmx_data_version_table(dv, "pk", client = client)
+vmx_pk <- function(dv, time_basis = NULL, client = vmx_client()) {
+  vmx_data_version_table(dv, "pk", time_basis = time_basis, client = client)
 }
 
 #' Dosing events table
 #' @param dv A data-version id or `vmx_data_version`.
+#' @param time_basis Optional time basis; see [vmx_data_version_table()].
 #' @param client A `vmx_client`.
 #' @return A tibble.
 #' @export
-vmx_dosing <- function(dv, client = vmx_client()) {
-  vmx_data_version_table(dv, "dosing", client = client)
+vmx_dosing <- function(dv, time_basis = NULL, client = vmx_client()) {
+  vmx_data_version_table(dv, "dosing", time_basis = time_basis, client = client)
 }
 
 #' PD observations table
 #' @param dv A data-version id or `vmx_data_version`.
+#' @param time_basis Optional time basis; see [vmx_data_version_table()].
 #' @param client A `vmx_client`.
 #' @return A tibble.
 #' @export
-vmx_pd <- function(dv, client = vmx_client()) {
-  vmx_data_version_table(dv, "pd", client = client)
+vmx_pd <- function(dv, time_basis = NULL, client = vmx_client()) {
+  vmx_data_version_table(dv, "pd", time_basis = time_basis, client = client)
 }
 
 #' Fetch model-ready tidy tables for a data version
 #'
-#' Returns a `vmx_model_data` bundle with `$subjects`, `$pk`, `$dosing`, and
-#' `$pd` (each a tibble, or `NULL` when the DataVersion has no such prepared
-#' table), and `$meta` (units, time bases, PD-marker manifest, subject count)
-#' read from the DataVersion. Only domains flagged in the DV's
-#' `table_availability` are fetched, so absent optional tables don't 404.
+#' Returns a `vmx_model_data` bundle with `$subjects`, `$pk`, `$dosing`, `$pd`,
+#' `$labs` and `$covariates` (each a tibble, or `NULL` when the DataVersion has
+#' no such prepared table), and `$meta` (units, time bases, the selected
+#' `time_basis`, PD-marker manifest, subject count) read from the DataVersion.
+#' Only domains flagged in the DV's `table_availability` are fetched, so absent
+#' optional tables don't 404. Every table is projected on the same time basis.
 #'
 #' @param dv A data-version id or `vmx_data_version`.
+#' @param time_basis Optional time basis; defaults to the DataVersion's
+#'   recommended basis. See [vmx_data_version_table()].
 #' @param client A `vmx_client`.
 #' @return A `vmx_model_data` object.
 #' @export
-vmx_model_data <- function(dv, client = vmx_client()) {
+vmx_model_data <- function(dv, time_basis = NULL, client = vmx_client()) {
   dv_obj <- if (inherits(dv, "vmx_data_version")) dv else vmx_data_version(vmx_id(dv, "dv"), client = client)
   avail <- vmx_table_availability(dv_obj)
+  basis <- vmx_resolve_time_basis(dv_obj, time_basis)
   fetch <- function(domain) {
-    if (isTRUE(avail[[domain]])) vmx_data_version_table(dv_obj, domain, client = client) else NULL
+    if (isTRUE(avail[[domain]])) {
+      vmx_data_version_table(dv_obj, domain, time_basis = basis, client = client)
+    } else {
+      NULL
+    }
   }
   structure(
     list(
@@ -260,11 +365,14 @@ vmx_model_data <- function(dv, client = vmx_client()) {
       pk = fetch("pk"),
       dosing = fetch("dosing"),
       pd = fetch("pd"),
+      labs = fetch("labs"),
+      covariates = fetch("covariates"),
       meta = list(
         data_version_id = dv_obj$data_version_id,
         units = dv_obj$units,
         time_bases = dv_obj$time_bases,
         recommended_time_basis = dv_obj$recommended_time_basis,
+        time_basis = basis,
         pd_markers = dv_obj$pd_markers,
         n_subjects = dv_obj$n_subjects,
         table_availability = avail
@@ -299,32 +407,17 @@ vmx_table_availability <- function(dv) {
 
 #' @export
 print.vmx_model_data <- function(x, ...) {
-  cli::cli_text("{.cls <vmx_model_data>} {x$meta$data_version_id %||% ''}")
+  cli::cli_text("{.cls <vmx_model_data>} {x$meta$data_version_id %||% ''} (time basis: {x$meta$time_basis %||% 'unspecified'})")
   dims <- function(t) if (is.null(t)) "-" else paste0(nrow(t), "x", ncol(t))
   cli::cli_bullets(c(
     "*" = "subjects: {dims(x$subjects)}",
     "*" = "pk: {dims(x$pk)}",
     "*" = "dosing: {dims(x$dosing)}",
-    "*" = "pd: {dims(x$pd)}"
+    "*" = "pd: {dims(x$pd)}",
+    "*" = "labs: {dims(x$labs)}",
+    "*" = "covariates: {dims(x$covariates)}"
   ))
   invisible(x)
-}
-
-#' NONMEM-layout data.frame for nlmixr2 / rxode2
-#'
-#' Not yet implemented. Assembling the NONMEM/`nlmixr2` layout
-#' (ID/TIME/DV/AMT/EVID/CMT/MDV/RATE/II/ADDL/SS + covariates) from the `pk` and
-#' `dosing` domain tables requires the DataVersion column/manifest contract to
-#' be pinned and validated against real data; see the package NEWS. Use
-#' [vmx_pk()] / [vmx_data_version_table()] for the tidy tables today.
-#'
-#' @param dv A data-version id or `vmx_data_version`.
-#' @param analyte Analyte to assemble.
-#' @param client A `vmx_client`.
-#' @return Not yet implemented.
-#' @export
-vmx_nlmixr_data <- function(dv, analyte = NULL, client = vmx_client()) {
-  vmx_abort_unimplemented("vmx_nlmixr_data()")
 }
 
 #' Ragged-array data list for Stan / Torsten
@@ -332,7 +425,9 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, client = vmx_client()) {
 #' Not yet implemented. The per-subject `start[i]`/`end[i]` index ranges and
 #' `iObs` observation index must be derived and verified against real data
 #' before shipping (this is the error-prone derivation the design flags); see
-#' the package NEWS.
+#' the package NEWS. When implemented it should reuse the event assembly in
+#' [vmx_nlmixr_data()] (eligibility admission, basis selection, dose and
+#' censoring encoding) and only add the ragged indexing on top.
 #'
 #' @param dv A data-version id or `vmx_data_version`.
 #' @param analyte Analyte to assemble.

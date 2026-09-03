@@ -4,10 +4,12 @@
 \alias{vmx_pd}
 \title{PD observations table}
 \usage{
-vmx_pd(dv, client = vmx_client())
+vmx_pd(dv, time_basis = NULL, client = vmx_client())
 }
 \arguments{
 \item{dv}{A data-version id or \code{vmx_data_version}.}
+
+\item{time_basis}{Optional time basis; see \code{\link[=vmx_data_version_table]{vmx_data_version_table()}}.}
 
 \item{client}{A \code{vmx_client}.}
 }

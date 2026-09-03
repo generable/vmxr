@@ -1,3 +1,24 @@
+# vmxr (development version)
+
+* `vmx_nlmixr_data()` is implemented (AGE-64). It assembles the NONMEM-layout
+  event dataset nlmixr2 / rxode2 consume — `ID`, `TIME`, `DV`, `AMT`, `EVID`,
+  `MDV`, `CMT`, `RATE`, `II`/`ADDL`/`SS`, `CENS`/`LIMIT`, `DVID`, `subject_id`
+  plus wide subject covariates — from a DataVersion's prepared `pk`, `dosing`,
+  `subjects`, `covariates` and (optionally) `pd` tables. Only rows the
+  DataVersion marks eligible for modeling are admitted (the after-QC flag by
+  default, the contract's mandatory admission filter; `before_qc` and `all`
+  are available for review). BLQ/ALQ rows are encoded as censored
+  observations, infusions carry `RATE`, routes map to compartments through
+  `vmx_nlmixr_default_cmt()`, and the `"vmx"` attribute records the basis,
+  units, analyte, endpoints and every dropped-row count.
+* API 0.3 table projection: `vmx_data_version_table()`, `vmx_subjects()`,
+  `vmx_pk()`, `vmx_dosing()`, `vmx_pd()` and `vmx_model_data()` gain a
+  `time_basis` argument. The DataVersion's recommended basis is used by default
+  (its `{value, reason}` object or the older bare-string form), an unavailable
+  basis is refused client-side, and the served `time_basis` is echoed as an
+  attribute. `vmx_model_data()` now also carries `$labs`, `$covariates` and
+  `$meta$time_basis`.
+
 # vmxr 0.2.0
 
 * Collection functions continue to return all matching rows. Cursor pages are
