@@ -7,6 +7,7 @@
 vmx_data_version_table(
   dv,
   domain = c("subjects", "pk", "dosing", "pd", "labs", "covariates"),
+  time_basis = NULL,
   client = vmx_client()
 )
 }
@@ -16,14 +17,25 @@ vmx_data_version_table(
 \item{domain}{One of \code{"subjects"}, \code{"pk"}, \code{"dosing"}, \code{"pd"}, \code{"labs"},
 \code{"covariates"}.}
 
+\item{time_basis}{Optional time basis name (e.g. \code{"observed"}). A basis the
+DataVersion does not list as available is refused client-side.}
+
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-A tibble.
+A tibble. The selected basis is attached as the \code{"time_basis"}
+attribute when one was requested or echoed.
 }
 \description{
 \code{GET /data-versions/{id}/tables/{domain}} — returns the formatter's prepared
 \code{domain} table as a tibble (columns typed per the server's column metadata,
 which is attached as the \code{"columns"} attribute). \code{gen_subject_uuid} is the
 canonical subject join key.
+}
+\details{
+API 0.3 projects every analytical table on a time basis and requires the
+\code{time_basis} query parameter. When \code{time_basis} is \code{NULL}, the
+DataVersion's recommended basis is used (fetching the DataVersion first if
+only an id was given); a DataVersion that advertises no recommended basis
+(an API 0.2 server) is fetched without the parameter.
 }

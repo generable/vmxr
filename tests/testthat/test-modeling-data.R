@@ -23,6 +23,7 @@ test_that("vmx_data_version_table coerces columns by declared type", {
   env <- new.env()
   httr2::local_mocked_responses(function(req) { env$req <- req; httr2::response_json(body = pk_table()) })
   tbl <- vmx_data_version_table("dv_1", "pk", client = con)
+  # no recommended basis on the (mocked) DataVersion -> no time_basis parameter
   expect_match(env$req$url, "/data-versions/dv_1/tables/pk$")
   expect_equal(nrow(tbl), 2L)
   expect_type(tbl$time, "double")
@@ -38,12 +39,12 @@ test_that("vmx_data_version_table validates the domain", {
 })
 
 test_that("data-version table rows must match the declared schema", {
-  httr2::local_mocked_responses(list(httr2::response_json(body = list(
+  httr2::local_mocked_responses(function(req) httr2::response_json(body = list(
     data_version_id = "dv_1",
     domain = "pk",
     columns = list(list(name = "time", type = "number")),
     rows = list(list(time = 1, undeclared = "x"))
-  ))))
+  )))
   expect_error(
     vmx_pk("dv_1", client = con),
     class = "vmx_response_error"
@@ -89,9 +90,9 @@ test_that("vmx_model_data bundles available tables + meta and skips absent ones"
   i <- 0
   httr2::local_mocked_responses(function(req) {
     i <<- i + 1
-    dom <- if (grepl("/subjects$", req$url)) {
+    dom <- if (grepl("/subjects(\\?|$)", req$url)) {
       "subjects"
-    } else if (grepl("/dosing$", req$url)) {
+    } else if (grepl("/dosing(\\?|$)", req$url)) {
       "dosing"
     } else {
       "pk"
@@ -122,7 +123,6 @@ test_that("vmx_model_data rejects incomplete table availability metadata", {
   )
 })
 
-test_that("nlmixr2 / torsten adapters remain deferred stubs", {
-  expect_error(vmx_nlmixr_data("dv_1", client = con), class = "vmx_unimplemented_error")
+test_that("the torsten adapter remains a deferred stub", {
   expect_error(vmx_torsten_data("dv_1", client = con), class = "vmx_unimplemented_error")
 })
