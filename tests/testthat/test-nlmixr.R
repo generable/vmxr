@@ -72,14 +72,86 @@ test_that("doses map route to compartment and infusions carry RATE", {
   expect_true(all(ev$II == 0 & ev$ADDL == 0L & ev$SS == 0L))
 })
 
-test_that("rows are ordered by subject, time, then observation before dose", {
+test_that("rows are ordered by subject, time, then dose before observation at ties", {
   httr2::local_mocked_responses(nlmixr_mock())
   ev <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)
   expect_false(is.unsorted(ev$ID))
   s1 <- ev[ev$ID == 1L, ]
   expect_false(is.unsorted(s1$TIME))
   at24 <- s1[s1$TIME == 24, ]
-  expect_equal(at24$EVID, c(0L, 1L))
+  expect_equal(at24$EVID, c(1L, 0L))                   # matches rxode2's tie resolution
+})
+
+test_that("IDs are dense over the subjects that have admitted rows", {
+  # make the placebo subject sort in the middle so a gap would show
+  subjects <- nlmixr_subjects_body()
+  subjects$rows[[1]]$subject_id <- "S15"                 # u3 (all rows ineligible)
+  subjects$rows[[2]]$subject_id <- "S1"
+  subjects$rows[[3]]$subject_id <- "S20"
+  httr2::local_mocked_responses(nlmixr_mock(tables = list(
+    subjects = subjects, pk = nlmixr_pk_body(), dosing = nlmixr_dosing_body(),
+    pd = nlmixr_pd_body(), covariates = nlmixr_covariates_body()
+  )))
+  ev <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)
+  expect_equal(sort(unique(ev$ID)), 1:2)
+  expect_equal(unique(ev$subject_id[ev$ID == 2L]), "S20")
+})
+
+test_that("no admitted rows is a usage error, not a crash", {
+  pk <- nlmixr_pk_body()
+  pk$rows <- lapply(pk$rows, function(r) { r$eligible_for_modeling_after_qc <- FALSE; r })
+  dv <- nlmixr_dv_body()
+  dv$time_bases$observed$pk_modeling_eligibility <- list(
+    eligible_for_modeling_before_qc = TRUE, eligible_for_modeling_after_qc = FALSE
+  )
+  httr2::local_mocked_responses(nlmixr_mock(dv = dv, tables = list(
+    subjects = nlmixr_subjects_body(), pk = pk, dosing = nlmixr_dosing_body(),
+    pd = nlmixr_pd_body(), covariates = nlmixr_covariates_body()
+  )))
+  expect_error(vmx_nlmixr_data("dv_1", client = con),                 # nothing admitted at all
+               class = "vmx_usage_error", regexp = "not eligible for modeling")
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con),
+               class = "vmx_usage_error", regexp = "no rows admitted")
+  # ... and the review mode still assembles them
+  ev <- suppressWarnings(vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "all", client = con))
+  expect_true(nrow(ev) > 0)
+})
+
+test_that("an analyte match may not span two analytes", {
+  pk <- nlmixr_pk_body()
+  # make the metabolite's code equal the drug's name
+  pk$rows[[5]]$biomarker_code <- "drug"
+  httr2::local_mocked_responses(nlmixr_mock(tables = list(
+    subjects = nlmixr_subjects_body(), pk = pk, dosing = nlmixr_dosing_body(),
+    pd = nlmixr_pd_body(), covariates = nlmixr_covariates_body()
+  )))
+  by_name <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)   # name match wins
+  expect_equal(attr(by_name, "vmx")$analyte, "drug")
+  expect_equal(sum(by_name$EVID == 0L), 5L)
+  pk$rows[[1]]$biomarker_code <- "shared"
+  pk$rows[[5]]$biomarker_code <- "shared"
+  httr2::local_mocked_responses(nlmixr_mock(tables = list(
+    subjects = nlmixr_subjects_body(), pk = pk, dosing = nlmixr_dosing_body(),
+    pd = nlmixr_pd_body(), covariates = nlmixr_covariates_body()
+  )))
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "shared", client = con),
+               class = "vmx_usage_error", regexp = "matches 2 analytes")
+})
+
+test_that("covariates are typed by the served type, including binary via value_int", {
+  cov <- nlmixr_covariates_body()
+  bin <- function(u, v) c(list(gen_subject_uuid = u, name = "smoker", label = "smoker", type = "binary",
+                               value_int = v, value_float = NULL, value_str = NULL, unit = NULL), nlmixr_flags())
+  cov$rows <- c(cov$rows, list(bin("u1", 1L), bin("u2", 0L), bin("u3", 0L)))
+  httr2::local_mocked_responses(nlmixr_mock(tables = list(
+    subjects = nlmixr_subjects_body(), pk = nlmixr_pk_body(), dosing = nlmixr_dosing_body(),
+    pd = nlmixr_pd_body(), covariates = cov
+  )))
+  ev <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)
+  expect_type(ev$smoker, "double")
+  expect_equal(unique(ev$smoker[ev$ID == 1L]), 1)
+  expect_equal(unique(ev$smoker[ev$ID == 2L]), 0)
+  expect_type(ev$sex, "character")
 })
 
 test_that("covariates and subject descriptors are joined wide by subject", {

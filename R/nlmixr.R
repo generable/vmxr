@@ -37,7 +37,12 @@ vmx_nlmixr_default_cmt <- function() {
 #' and rxode2 consume directly: one row per dose event and per observation,
 #' ordered by subject and time.
 #'
-#' Columns: `ID` (dense integer per subject), `TIME` (hours on the selected
+#' Rows are ordered by subject and time; ties on `TIME` are ordered dose
+#' before observation, which is how rxode2 and nlmixr2 resolve them, so a
+#' pre-dose sample that shares its time with an IV bolus into the observation
+#' compartment must carry its own earlier time in the source data.
+#'
+#' Columns: `ID` (dense integer per subject with admitted rows), `TIME` (hours on the selected
 #' time basis), `DV`, `AMT` (mg), `EVID` (0 observation / 1 dose), `MDV`, `CMT`,
 #' `RATE` (mg/h, > 0 for infusions), `II`, `ADDL`, `SS` (always 0 — the
 #' DataVersion already expands doses per administration), `CENS` / `LIMIT`
@@ -120,7 +125,7 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
   pk <- vmx_nlmixr_admit(md$pk, eligibility, "pk")
   dropped$pk_ineligible <- pk$n_dropped
   pk <- pk$rows
-  pk_analyte <- vmx_nlmixr_select_analyte(pk, analyte)
+  pk_analyte <- vmx_nlmixr_select_analyte(pk, analyte, all_rows = md$pk)
   dropped$pk_other_analytes <- nrow(pk) - nrow(pk_analyte$rows)
   pk <- pk_analyte$rows
   pk_obs <- vmx_nlmixr_observations(
@@ -157,14 +162,14 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     pd <- vmx_nlmixr_admit(md$pd, eligibility, "pd")
     dropped$pd_ineligible <- pd$n_dropped
     pd <- pd$rows
-    marker_sel <- vmx_nlmixr_pd_markers(pd, pd_selection, md$meta, basis, eligibility)
+    marker_sel <- vmx_nlmixr_pd_markers(pd, pd_selection, md$meta, basis, eligibility, all_rows = md$pd)
     dropped$pd_markers_ineligible <- marker_sel$n_dropped
     keys <- vmx_nlmixr_marker_key(pd)
     next_cmt <- max(cmt)
     unencodable <- 0L
     for (k in seq_along(marker_sel$markers)) {
       marker <- marker_sel$markers[[k]]
-      rows_k <- pd[keys == marker, , drop = FALSE]
+      rows_k <- pd[which(keys == marker), , drop = FALSE]
       next_cmt <- next_cmt + 1L
       obs_k <- vmx_nlmixr_observations(
         rows_k,
@@ -188,9 +193,16 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
 
   # ---- assemble -----------------------------------------------------------
   events <- do.call(rbind, c(list(pk_obs$rows, doses$rows), pd_parts))
-  if (nrow(events) == 0L) {
+  if (nrow(events) == 0L || !any(events$EVID == 0L) || !any(events$EVID == 1L)) {
+    pk_flag <- vmx_nlmixr_basis_pk_flag(md$meta, basis, eligibility)
     vmx_abort(
-      "No eligible PK observations or dose events remain for this DataVersion, analyte, and time basis.",
+      c(
+        sprintf(
+          "No %s remain for this DataVersion, analyte, and time basis under `eligibility = \"%s\"`.",
+          if (!any(events$EVID == 0L)) "eligible PK observations" else "eligible dose events", eligibility
+        ),
+        if (isFALSE(pk_flag)) "i" = sprintf("The DataVersion marks PK on basis '%s' as not eligible for modeling; the table is readable for review with `eligibility = \"all\"`.", basis)
+      ),
       class = "vmx_usage_error"
     )
   }
@@ -201,9 +213,13 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
       field = "gen_subject_uuid"
     )
   }
-  events$ID <- ids
+  # Dense 1..n over the subjects that actually have rows, in subjects-table order.
+  events$ID <- match(ids, sort(unique(ids)))
   events$subject_id <- subjects$subject_id[match(events$gen_subject_uuid, subjects$gen_subject_uuid)]
-  events <- events[order(events$ID, events$TIME, events$EVID, events$CMT, events$DVID), , drop = FALSE]
+  # Ties on TIME are ordered dose-first, matching how rxode2/nlmixr2 resolve
+  # them; a pre-dose sample coincident with an IV bolus into the observation
+  # compartment therefore needs its own (earlier) time in the source data.
+  events <- events[order(events$ID, events$TIME, -events$EVID, events$CMT, events$DVID), , drop = FALSE]
 
   covariates <- vmx_nlmixr_covariates(md$covariates, eligibility)
   if (!is.null(covariates)) {
@@ -345,7 +361,11 @@ vmx_nlmixr_marker_key <- function(tbl) {
   rep("value", nrow(tbl))
 }
 
-vmx_nlmixr_select_analyte <- function(pk, analyte) {
+# Pick one PK analyte among the admitted rows. `analyte` matches
+# `biomarker_name` first; `biomarker_code` is consulted only when no name
+# matches, and a match may never span two names. `all_rows` (the unfiltered
+# table) tells "no eligible rows" apart from "no such analyte".
+vmx_nlmixr_select_analyte <- function(pk, analyte, all_rows = pk) {
   key <- vmx_nlmixr_marker_key(pk)
   code <- if ("biomarker_code" %in% names(pk)) as.character(pk$biomarker_code) else key
   present <- unique(key[!is.na(key)])
@@ -361,18 +381,42 @@ vmx_nlmixr_select_analyte <- function(pk, analyte) {
     }
     return(list(rows = pk, name = if (length(present)) present[[1]] else "pk"))
   }
-  hit <- key == analyte | code == analyte
-  hit[is.na(hit)] <- FALSE
+  hit <- key %in% analyte
+  if (!any(hit)) hit <- code %in% analyte
   if (!any(hit)) {
+    all_key <- vmx_nlmixr_marker_key(all_rows)
+    all_code <- if ("biomarker_code" %in% names(all_rows)) as.character(all_rows$biomarker_code) else all_key
+    known <- any(all_key %in% analyte | all_code %in% analyte)
+    vmx_abort(
+      if (known) {
+        sprintf("`analyte` '%s' has no rows admitted by the selected eligibility rule.", analyte)
+      } else {
+        sprintf("`analyte` '%s' is not in the PK table (available: %s).", analyte, paste(present, collapse = ", "))
+      },
+      class = "vmx_usage_error"
+    )
+  }
+  names_hit <- unique(key[hit])
+  if (length(names_hit) != 1L) {
     vmx_abort(
       sprintf(
-        "`analyte` '%s' is not in the PK table (available: %s).",
-        analyte, paste(present, collapse = ", ")
+        "`analyte` '%s' matches %d analytes by code (%s); name one of them by `biomarker_name`.",
+        analyte, length(names_hit), paste(names_hit, collapse = ", ")
       ),
       class = "vmx_usage_error"
     )
   }
-  list(rows = pk[hit, , drop = FALSE], name = unique(key[hit])[[1]])
+  list(rows = pk[hit, , drop = FALSE], name = names_hit[[1]])
+}
+
+# The DataVersion's own verdict on PK modeling eligibility for a basis, or NULL
+# when the metadata does not carry it.
+vmx_nlmixr_basis_pk_flag <- function(meta, basis, eligibility) {
+  flag <- vmx_nlmixr_flag_column(eligibility)
+  bases <- meta$time_bases
+  if (is.null(flag) || is.null(basis) || !is.list(bases) || !is.list(bases[[basis]])) return(NULL)
+  value <- bases[[basis]]$pk_modeling_eligibility[[flag]]
+  if (is.logical(value) && length(value) == 1L) value else NULL
 }
 
 # Markers to include: those requested that exist in the pd table AND that the
@@ -380,17 +424,26 @@ vmx_nlmixr_select_analyte <- function(pk, analyte) {
 # "Selected PD markers additionally require post-QC modeling eligibility").
 # An explicitly named ineligible marker is a usage error; under `TRUE` it is
 # dropped and counted.
-vmx_nlmixr_pd_markers <- function(pd, selection, meta, basis, eligibility) {
+vmx_nlmixr_pd_markers <- function(pd, selection, meta, basis, eligibility, all_rows = pd) {
   key <- vmx_nlmixr_marker_key(pd)
   present <- unique(key[!is.na(key)])
   wanted <- if (isTRUE(selection)) present else selection
   missing <- setdiff(wanted, present)
   if (length(missing)) {
+    served <- unique(stats::na.omit(vmx_nlmixr_marker_key(all_rows)))
+    filtered_out <- intersect(missing, served)
     vmx_abort(
-      sprintf(
-        "%d requested PD marker(s) are not in the `pd` table (available: %s).",
-        length(missing), paste(present, collapse = ", ")
-      ),
+      if (length(filtered_out)) {
+        sprintf(
+          "%d requested PD marker(s) have no rows admitted by the selected eligibility rule (%s).",
+          length(filtered_out), paste(filtered_out, collapse = ", ")
+        )
+      } else {
+        sprintf(
+          "%d requested PD marker(s) are not in the `pd` table (available: %s).",
+          length(missing), paste(present, collapse = ", ")
+        )
+      },
       class = "vmx_usage_error"
     )
   }
@@ -419,7 +472,7 @@ vmx_nlmixr_marker_flags <- function(meta, basis, flag) {
   out <- logical()
   manifest <- meta$pd_markers
   bases <- meta$time_bases
-  if (!is.list(manifest) || !is.list(bases) || is.null(basis) || is.null(bases[[basis]])) return(out)
+  if (!is.list(manifest) || !is.list(bases) || is.null(basis) || !is.list(bases[[basis]])) return(out)
   elig <- bases[[basis]]$pd_marker_eligibility
   if (!is.list(elig) || !length(elig)) return(out)
   uuid_to_name <- stats::setNames(
@@ -505,7 +558,8 @@ vmx_nlmixr_observations <- function(tbl, basis, dvid, cmt, domain, strict) {
   dv[alq] <- uloq[alq]
   cens[alq] <- -1L
   limit[alq] <- Inf
-  rows <- data.frame(
+  rows <- vmx_nlmixr_event_frame(
+    n,
     gen_subject_uuid = as.character(tbl$gen_subject_uuid),
     TIME = time,
     DV = dv,
@@ -519,10 +573,16 @@ vmx_nlmixr_observations <- function(tbl, basis, dvid, cmt, domain, strict) {
     SS = 0L,
     CENS = cens,
     LIMIT = limit,
-    DVID = as.integer(dvid),
-    stringsAsFactors = FALSE
+    DVID = as.integer(dvid)
   )
   list(rows = rows[ok, , drop = FALSE], n_dropped = sum(!ok))
+}
+
+# data.frame constructor that tolerates n == 0 (base::data.frame refuses to
+# recycle scalar columns against a zero-length vector).
+vmx_nlmixr_event_frame <- function(n, ...) {
+  cols <- lapply(list(...), function(v) if (length(v) == n) v else rep_len(v, n))
+  as.data.frame(cols, stringsAsFactors = FALSE, optional = TRUE)
 }
 
 # Dose rows in NONMEM layout: AMT from canonical dose_mass, RATE from the
@@ -564,7 +624,8 @@ vmx_nlmixr_doses <- function(dosing, basis, cmt, strict) {
   rate[infusion] <- dose_rate[infusion]
   cmt_idx <- rep(NA_integer_, n)
   cmt_idx[route_ok] <- as.integer(unname(cmt[route[route_ok]]))
-  rows <- data.frame(
+  rows <- vmx_nlmixr_event_frame(
+    n,
     gen_subject_uuid = as.character(dosing$gen_subject_uuid),
     TIME = time,
     DV = NA_real_,
@@ -580,8 +641,7 @@ vmx_nlmixr_doses <- function(dosing, basis, cmt, strict) {
     LIMIT = NA_real_,
     # rxode2 renumbers DVID to 1..n over every row, so dose rows take the PK
     # endpoint's id rather than a sentinel that would shift the numbering.
-    DVID = 1L,
-    stringsAsFactors = FALSE
+    DVID = 1L
   )
   list(rows = rows[ok, , drop = FALSE], n_dropped = sum(!ok))
 }
@@ -612,19 +672,18 @@ vmx_nlmixr_subject_map <- function(subjects) {
 }
 
 # Long covariate rows -> one column per covariate name, per subject, typed by
-# the served `type` (schema §10.6): categorical/string -> `value_str`,
-# otherwise the numeric typed columns.
+# the served `type` (schema §10.6): `categorical` -> `value_str`; `count` /
+# `binary` -> `value_int`; continuous kinds -> `value_float`. A type-less
+# (pre-0.3) table falls back to whichever typed column is populated.
 vmx_nlmixr_covariates <- function(covariates, eligibility) {
   if (is.null(covariates) || nrow(covariates) == 0L || !"name" %in% names(covariates)) return(NULL)
-  flag <- vmx_nlmixr_flag_column(eligibility)
-  if (!is.null(flag) && flag %in% names(covariates)) {
-    covariates <- covariates[covariates[[flag]] %in% TRUE, , drop = FALSE]
-  }
+  admitted <- vmx_nlmixr_admit(covariates, eligibility, "covariates")
+  covariates <- admitted$rows
   subjects <- unique(as.character(covariates$gen_subject_uuid))
   out <- data.frame(gen_subject_uuid = subjects, stringsAsFactors = FALSE)
   types <- as.character(vmx_nlmixr_optional(covariates, "type"))
   for (nm in unique(as.character(covariates$name))) {
-    sel <- covariates$name == nm
+    sel <- which(covariates$name == nm)
     rows <- covariates[sel, , drop = FALSE]
     if (anyDuplicated(rows$gen_subject_uuid)) {
       vmx_abort_response(
@@ -632,11 +691,14 @@ vmx_nlmixr_covariates <- function(covariates, eligibility) {
         field = "covariates"
       )
     }
-    textual <- any(types[sel] %in% c("categorical", "string", "boolean", "binary"))
-    values <- if (textual) {
-      as.character(vmx_nlmixr_optional(rows, "value_str"))
+    numeric <- vmx_nlmixr_value(rows)
+    textual <- as.character(vmx_nlmixr_optional(rows, "value_str"))
+    values <- if (any(types[sel] %in% c("categorical", "string"))) {
+      textual
+    } else if (all(is.na(numeric)) && any(!is.na(textual))) {
+      textual
     } else {
-      vmx_nlmixr_value(rows)
+      numeric
     }
     out[[nm]] <- values[match(subjects, as.character(rows$gen_subject_uuid))]
   }
