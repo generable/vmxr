@@ -36,6 +36,8 @@ canonical subject join key.
 API 0.3 projects every analytical table on a time basis and requires the
 \code{time_basis} query parameter. When \code{time_basis} is \code{NULL}, the
 DataVersion's recommended basis is used (fetching the DataVersion first if
-only an id was given); a DataVersion that advertises no recommended basis
-(an API 0.2 server) is fetched without the parameter.
+only an id was given). A v0.3 DataVersion with no recommended basis (no
+basis has PK-eligible subjects) needs an explicit \code{time_basis}; only a
+DataVersion without a \code{time_bases} map (an API 0.2 server) is fetched
+without the parameter.
 }

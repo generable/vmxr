@@ -31,9 +31,18 @@ nlmixr_flag_cols <- function() {
   )
 }
 
+nlmixr_marker_elig <- function(effect = TRUE, resp = TRUE) {
+  list(
+    list(gen_uuid = "mk-effect", eligible_for_modeling_before_qc = TRUE,
+         eligible_for_modeling_after_qc = effect),
+    list(gen_uuid = "mk-resp", eligible_for_modeling_before_qc = TRUE,
+         eligible_for_modeling_after_qc = resp)
+  )
+}
+
 nlmixr_dv_body <- function(recommended = list(value = "observed", reason = "only eligible basis"),
                            time_bases = list(
-                             observed = list(available = TRUE),
+                             observed = list(available = TRUE, pd_marker_eligibility = nlmixr_marker_elig()),
                              nominal = list(available = FALSE, availability_reasons = list("no nominal times"))
                            ),
                            table_availability = list(
@@ -49,10 +58,16 @@ nlmixr_dv_body <- function(recommended = list(value = "observed", reason = "only
     time_bases = time_bases,
     table_availability = table_availability,
     pd_markers = list(
-      list(name = "effect", display_name = "effect", type = "continuous", unit = "%"),
-      list(name = "resp", display_name = "resp", type = "binary", unit = "1")
+      list(gen_uuid = "mk-effect", name = "effect", display_name = "effect", type = "continuous", unit = "%"),
+      list(gen_uuid = "mk-resp", name = "resp", display_name = "resp", type = "binary", unit = "1")
     )
   )
+}
+
+# A DataVersion as an API 0.2 server describes it: no time_bases map, no
+# recommended basis, and tables served without eligibility flags or a basis echo.
+nlmixr_legacy_dv_body <- function() {
+  nlmixr_dv_body(recommended = NULL, time_bases = list())
 }
 
 nlmixr_subjects_body <- function() {

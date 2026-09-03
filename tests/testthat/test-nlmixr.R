@@ -105,15 +105,39 @@ test_that("analyte selection is explicit when several analytes are present", {
   expect_equal(sum(by_code$EVID == 0L), 5L)
 })
 
-test_that("the eligibility flag is selectable and 'all' keeps every row", {
+test_that("the eligibility flag is selectable; review modes warn and are not analysis-ready", {
   httr2::local_mocked_responses(nlmixr_mock())
-  before <- vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "before_qc", client = con)
+  expect_warning(
+    before <- vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "before_qc", client = con),
+    "review only"
+  )
   expect_true(any(before$DV %in% 3))                    # QC-excluded row admitted before QC
   expect_equal(unname(attr(before, "vmx")$dropped[["pk_ineligible"]]), 1L)
-  all_rows <- vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "all", client = con)
+  expect_false(attr(before, "vmx")$analysis_ready)
+  all_rows <- suppressWarnings(vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "all", client = con))
   expect_equal(sort(unique(all_rows$ID)), 1:3)
   expect_true(any(all_rows$AMT == 0 & all_rows$EVID == 1L))
   expect_equal(attr(all_rows, "vmx")$eligibility, "all")
+  expect_false(attr(all_rows, "vmx")$analysis_ready)
+  strict <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)
+  expect_true(attr(strict, "vmx")$analysis_ready)
+})
+
+test_that("review modes drop unencodable retained-ineligible rows with a count", {
+  dosing <- nlmixr_dosing_body()
+  dosing$rows[[4]]$route <- "topical"              # ineligible placebo row, non-vocabulary route
+  dosing$rows[[3]]["dose_rate"] <- list(NULL)      # infusion without canonical rate (null cell)
+  dosing$rows[[3]]$eligible_for_modeling_after_qc <- FALSE
+  dosing$rows[[3]]$eligible_for_modeling_before_qc <- FALSE
+  httr2::local_mocked_responses(nlmixr_mock(tables = list(
+    subjects = nlmixr_subjects_body(), pk = nlmixr_pk_body(), dosing = dosing,
+    pd = nlmixr_pd_body(), covariates = nlmixr_covariates_body()
+  )))
+  strict <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)
+  expect_equal(sum(strict$EVID == 1L), 2L)          # both bad rows are ineligible -> filtered
+  all_rows <- suppressWarnings(vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "all", client = con))
+  expect_equal(sum(all_rows$EVID == 1L), 2L)        # ... and under `all` dropped as unencodable
+  expect_equal(unname(attr(all_rows, "vmx")$dropped[["dosing_unencodable"]]), 2L)
 })
 
 test_that("PD markers become extra endpoints with their own CMT and DVID", {
@@ -138,6 +162,36 @@ test_that("PD markers become extra endpoints with their own CMT and DVID", {
     vmx_nlmixr_data("dv_1", analyte = "drug", pd_markers = "nope", client = con),
     class = "vmx_usage_error"
   )
+})
+
+test_that("a PD marker the DataVersion marks ineligible on the basis is excluded", {
+  dv <- nlmixr_dv_body(time_bases = list(
+    observed = list(available = TRUE, pd_marker_eligibility = nlmixr_marker_elig(resp = FALSE)),
+    nominal = list(available = FALSE)
+  ))
+  httr2::local_mocked_responses(nlmixr_mock(dv = dv))
+  ev <- vmx_nlmixr_data("dv_1", analyte = "drug", pd_markers = TRUE, client = con)
+  expect_equal(attr(ev, "vmx")$endpoints$name, c("drug", "effect"))
+  expect_equal(unname(attr(ev, "vmx")$dropped[["pd_markers_ineligible"]]), 1L)
+  expect_error(
+    vmx_nlmixr_data("dv_1", analyte = "drug", pd_markers = "resp", client = con),
+    class = "vmx_usage_error"
+  )
+  # before-QC review admits it again
+  before <- suppressWarnings(vmx_nlmixr_data("dv_1", analyte = "drug", pd_markers = TRUE,
+                                             eligibility = "before_qc", client = con))
+  expect_equal(attr(before, "vmx")$endpoints$name, c("drug", "effect", "resp"))
+})
+
+test_that("an analytical row whose subject is missing from `subjects` is a served-contract violation", {
+  pk <- nlmixr_pk_body()
+  pk$rows[[1]]$gen_subject_uuid <- "u-orphan"
+  httr2::local_mocked_responses(nlmixr_mock(tables = list(
+    subjects = nlmixr_subjects_body(), pk = pk, dosing = nlmixr_dosing_body(),
+    pd = nlmixr_pd_body(), covariates = nlmixr_covariates_body()
+  )))
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con),
+               class = "vmx_response_error", regexp = "absent from the `subjects` table")
 })
 
 test_that("the compartment map can be overridden", {
@@ -167,24 +221,25 @@ test_that("an explicit time basis is honoured and an unavailable one refused", {
 })
 
 test_that("contract violations in the served tables fail loudly", {
-  # infusion with neither rate nor duration
+  # an admitted infusion without the canonical rate (duration is never used to fill it)
   dosing <- nlmixr_dosing_body()
-  dosing$rows[[3]]$dose_rate <- NULL
-  dosing$rows[[3]]$dose_duration <- NULL
+  dosing$rows[[3]]["dose_rate"] <- list(NULL)
   httr2::local_mocked_responses(nlmixr_mock(tables = list(
     subjects = nlmixr_subjects_body(), pk = nlmixr_pk_body(), dosing = dosing,
     pd = nlmixr_pd_body(), covariates = nlmixr_covariates_body()
   )))
-  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con), class = "vmx_response_error")
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con),
+               class = "vmx_response_error", regexp = "dose_rate")
 
   # BLQ without an lloq
   pk <- nlmixr_pk_body()
-  pk$rows[[3]]$lloq <- NULL
+  pk$rows[[3]]["lloq"] <- list(NULL)
   httr2::local_mocked_responses(nlmixr_mock(tables = list(
     subjects = nlmixr_subjects_body(), pk = pk, dosing = nlmixr_dosing_body(),
     pd = nlmixr_pd_body(), covariates = nlmixr_covariates_body()
   )))
-  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con), class = "vmx_response_error")
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con),
+               class = "vmx_response_error", regexp = "lloq")
 
   # a served basis that differs from the requested one
   httr2::local_mocked_responses(function(req) {
@@ -194,6 +249,25 @@ test_that("contract violations in the served tables fail loudly", {
     httr2::response_json(body = body)
   })
   expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con), class = "vmx_response_error")
+
+  # a v0.3 server that does not echo the basis at all
+  httr2::local_mocked_responses(function(req) {
+    resp <- nlmixr_mock()(req)
+    body <- httr2::resp_body_json(resp)
+    if (!is.null(body$domain)) body$time_basis <- NULL
+    httr2::response_json(body = body)
+  })
+  expect_error(vmx_pk("dv_1", client = con), class = "vmx_response_error")
+})
+
+test_that("a v0.3 DataVersion with no recommended basis needs an explicit one", {
+  dv <- nlmixr_dv_body(recommended = NULL)
+  log <- new.env()
+  httr2::local_mocked_responses(nlmixr_mock(log, dv = dv))
+  expect_error(vmx_pk("dv_1", client = con), class = "vmx_usage_error")
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con), class = "vmx_usage_error")
+  ev <- vmx_nlmixr_data("dv_1", analyte = "drug", time_basis = "observed", client = con)
+  expect_equal(attr(ev, "vmx")$time_basis, "observed")
 })
 
 test_that("a pre-0.3 table without eligibility flags needs eligibility = 'all'", {
@@ -210,10 +284,16 @@ test_that("a pre-0.3 table without eligibility flags needs eligibility = 'all'",
     dosing = strip(nlmixr_dosing_body()), pd = strip(nlmixr_pd_body()),
     covariates = strip(nlmixr_covariates_body())
   )
-  httr2::local_mocked_responses(nlmixr_mock(tables = tables))
+  # an API 0.2 server: no time_bases map, tables served without a basis echo
+  httr2::local_mocked_responses(nlmixr_mock(dv = nlmixr_legacy_dv_body(), tables = tables))
   expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con), class = "vmx_usage_error")
-  ev <- vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "all", client = con)
+  ev <- suppressWarnings(vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "all", client = con))
   expect_equal(sort(unique(ev$ID)), 1:3)
+  expect_null(attr(ev, "vmx")$time_basis)
+
+  # a v0.3 table (basis echoed) missing the flags is a served-contract violation, not a usage error
+  httr2::local_mocked_responses(nlmixr_mock(tables = tables))
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con), class = "vmx_response_error")
 })
 
 test_that("vmx_data_version_table resolves the basis from a bare id and echoes it", {
@@ -232,10 +312,9 @@ test_that("vmx_data_version_table resolves the basis from a bare id and echoes i
   expect_match(log2$requests[[1]], "/tables/pk\\?time_basis=observed$")
 })
 
-test_that("a DataVersion without a recommended basis is fetched without the parameter", {
+test_that("an API 0.2 DataVersion (no time_bases map) is fetched without the parameter", {
   log <- new.env()
-  legacy <- nlmixr_dv_body(recommended = NULL, time_bases = list())
-  httr2::local_mocked_responses(nlmixr_mock(log, dv = legacy))
+  httr2::local_mocked_responses(nlmixr_mock(log, dv = nlmixr_legacy_dv_body()))
   tbl <- vmx_pk("dv_1", client = con)
   expect_null(attr(tbl, "time_basis"))
   expect_false(grepl("time_basis", log$requests[[2]]))
