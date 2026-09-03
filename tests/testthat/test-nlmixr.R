@@ -3,7 +3,7 @@
 con <- vmx_client(base_url = "https://vmx.test", token = "pat_test")
 
 nlmixr_core_cols <- c("ID", "TIME", "DV", "AMT", "EVID", "MDV", "CMT", "RATE", "II",
-                      "ADDL", "SS", "CENS", "LIMIT", "DVID", "subject_id")
+                      "ADDL", "SS", "CENS", "LIMIT", "subject_id")
 
 test_that("assembles doses and eligible PK observations in NONMEM layout", {
   log <- new.env()
@@ -12,6 +12,7 @@ test_that("assembles doses and eligible PK observations in NONMEM layout", {
 
   expect_s3_class(ev, "tbl_df")
   expect_identical(names(ev)[seq_along(nlmixr_core_cols)], nlmixr_core_cols)
+  expect_false("DVID" %in% names(ev))                   # single endpoint -> no DVID column
   # every table request carried the recommended basis
   table_urls <- grep("/tables/", log$requests, value = TRUE)
   expect_true(length(table_urls) >= 5)
@@ -123,10 +124,14 @@ test_that("PD markers become extra endpoints with their own CMT and DVID", {
   expect_equal(ends$name, c("drug", "effect", "resp"))
   expect_equal(ends$cmt, c(2L, 3L, 4L))
   expect_equal(ends$unit, c("mg/L", "%", "1"))
+  expect_true("DVID" %in% names(ev))
+  expect_identical(names(ev)[14:15], c("DVID", "subject_id"))
   expect_equal(sum(ev$DVID == 2L), 2L)
   expect_equal(sum(ev$DVID == 3L), 1L)
   expect_equal(ev$CMT[ev$DVID == 3L], 4L)
   expect_equal(ev$DV[ev$DVID == 3L], 1)
+  expect_true(all(ev$DVID[ev$EVID == 1L] == 1L))       # dose rows share the PK endpoint id
+  expect_setequal(unique(ev$DVID), 1:3)
   one <- vmx_nlmixr_data("dv_1", analyte = "drug", pd_markers = "effect", client = con)
   expect_equal(attr(one, "vmx")$endpoints$name, c("drug", "effect"))
   expect_error(
@@ -267,7 +272,7 @@ test_that("the assembled events are accepted by rxode2", {
 })
 
 test_that("a recorded API 0.3 DataVersion fits a one-compartment model in nlmixr2", {
-  skip_if_not_installed("nlmixr2")
+  skip_if_not_installed("nlmixr2est")
   skip_if(!identical(Sys.getenv("VMXR_TEST_NLMIXR2"), "true"),
           "set VMXR_TEST_NLMIXR2=true to run the nlmixr2 end-to-end fit")
   fixture <- function(name) {
@@ -296,8 +301,8 @@ test_that("a recorded API 0.3 DataVersion fits a one-compartment model in nlmixr
       cp ~ add(add.sd)
     })
   }
-  fit <- suppressMessages(nlmixr2::nlmixr(one_cmt, as.data.frame(ev), est = "focei",
-                                          control = nlmixr2::foceiControl(print = 0)))
+  fit <- suppressMessages(nlmixr2est::nlmixr2(one_cmt, as.data.frame(ev), est = "focei",
+                                              control = nlmixr2est::foceiControl(print = 0)))
   expect_s3_class(fit, "nlmixr2FitCore")
   expect_true(is.finite(fit$objf))
 })

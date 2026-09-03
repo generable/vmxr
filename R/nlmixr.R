@@ -38,8 +38,8 @@ vmx_nlmixr_default_cmt <- function() {
 #' DataVersion already expands doses per administration), `CENS` / `LIMIT`
 #' (censoring: `CENS = 1` with `DV = lloq` and `LIMIT = 0` for BLQ rows,
 #' `CENS = -1` with `DV = uloq` and `LIMIT = Inf` for ALQ rows), `DVID`
-#' (1 = PK, 2.. = PD markers when requested), `subject_id`, and one column per
-#' subject-level covariate.
+#' (only when PD markers are included: 1 = PK, 2.. = PD markers, and dose rows
+#' carry 1), `subject_id`, and one column per subject-level covariate.
 #'
 #' Only rows the DataVersion marks as eligible for modeling are kept; the
 #' after-QC flag is the contract's mandatory admission filter. Rows dropped by
@@ -202,6 +202,12 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
 
   core <- c("ID", "TIME", "DV", "AMT", "EVID", "MDV", "CMT", "RATE", "II", "ADDL",
             "SS", "CENS", "LIMIT", "DVID", "subject_id")
+  if (nrow(endpoints) == 1L) {
+    # Single endpoint: rxode2 treats a DVID column as an endpoint index and warns
+    # when it is not 1..n, so only emit it for multi-endpoint (PD) datasets.
+    events$DVID <- NULL
+    core <- setdiff(core, "DVID")
+  }
   out <- tibble::as_tibble(events[, c(core, setdiff(names(events), c(core, "gen_subject_uuid"))), drop = FALSE])
   rownames(out) <- NULL
   attr(out, "vmx") <- list(
@@ -476,7 +482,9 @@ vmx_nlmixr_doses <- function(dosing, time, cmt) {
     SS = 0L,
     CENS = 0L,
     LIMIT = NA_real_,
-    DVID = 0L,
+    # rxode2 renumbers DVID to 1..n over every row, so dose rows take the PK
+    # endpoint's id rather than a sentinel that would shift the numbering.
+    DVID = 1L,
     stringsAsFactors = FALSE
   )
 }

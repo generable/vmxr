@@ -57,8 +57,8 @@ time basis), \code{DV}, \code{AMT} (mg), \code{EVID} (0 observation / 1 dose), \
 DataVersion already expands doses per administration), \code{CENS} / \code{LIMIT}
 (censoring: \code{CENS = 1} with \code{DV = lloq} and \code{LIMIT = 0} for BLQ rows,
 \code{CENS = -1} with \code{DV = uloq} and \code{LIMIT = Inf} for ALQ rows), \code{DVID}
-(1 = PK, 2.. = PD markers when requested), \code{subject_id}, and one column per
-subject-level covariate.
+(only when PD markers are included: 1 = PK, 2.. = PD markers, and dose rows
+carry 1), \code{subject_id}, and one column per subject-level covariate.
 
 Only rows the DataVersion marks as eligible for modeling are kept; the
 after-QC flag is the contract's mandatory admission filter. Rows dropped by
