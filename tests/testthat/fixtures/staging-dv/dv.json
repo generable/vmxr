@@ -1,0 +1,139 @@
+{
+ "data_version_id": "dv_efff48d2b1fb4f919c4d27283ced5956",
+ "status": "ready",
+ "data_version_number": {
+  "major": 1,
+  "minor": 0
+ },
+ "n_subjects": 12,
+ "units": {
+  "dose": "mg",
+  "time": "h",
+  "pk_concentration": "mg/L"
+ },
+ "recommended_time_basis": {
+  "value": "observed",
+  "reason": "This basis has 11 subjects eligible for PK modeling before QC and is the only eligible time basis."
+ },
+ "table_availability": {
+  "subjects": true,
+  "pk": true,
+  "dosing": true,
+  "pd": true,
+  "labs": false,
+  "covariates": true,
+  "qc_issues": true
+ },
+ "pd_markers": [
+  {
+   "gen_uuid": "eecd5304-fca2-4f5c-9285-aa713a3e6104",
+   "name": "pdcont",
+   "display_name": "pdcont",
+   "type": "continuous",
+   "unit": "%"
+  },
+  {
+   "gen_uuid": "bb11d5ed-755e-411f-808c-c9718d5565a2",
+   "name": "pdresp",
+   "display_name": "pdresp",
+   "type": "binary",
+   "unit": "1"
+  }
+ ],
+ "dose_groups": [
+  {
+   "name": "1.5 mg/kg",
+   "display_name": "1.5 mg/kg",
+   "order": 1,
+   "tau_hours": null,
+   "n_subjects": 12
+  }
+ ],
+ "covariates": [
+  {
+   "name": "weight",
+   "display_name": "weight",
+   "type": "positive_continuous",
+   "unit": "kg",
+   "categories": null,
+   "very_important": true
+  },
+  {
+   "name": "age",
+   "display_name": "age",
+   "type": "continuous",
+   "unit": "years",
+   "categories": null,
+   "very_important": true
+  },
+  {
+   "name": "sex",
+   "display_name": "sex",
+   "type": "categorical",
+   "unit": null,
+   "categories": [
+    "male",
+    "female"
+   ],
+   "very_important": true
+  }
+ ],
+ "time_bases": {
+  "observed": {
+   "available": true,
+   "availability_reasons": [],
+   "time_origin": "first_study_drug_administration_start",
+   "fields_by_table": {
+    "measurements": "observed_time_hours",
+    "exposures": "observed_time_hours"
+   }
+  },
+  "nominal": {
+   "available": false,
+   "availability_reasons": [
+    {
+     "code": "projection_unavailable",
+     "message": "The formatter could not construct this time-basis projection.",
+     "field": null
+    }
+   ],
+   "time_origin": "first_study_drug_administration_start",
+   "fields_by_table": {
+    "measurements": "nominal_time_hours",
+    "exposures": "nominal_time_hours"
+   }
+  },
+  "nominal_from_observed_dose": {
+   "available": false,
+   "availability_reasons": [
+    {
+     "code": "projection_unavailable",
+     "message": "The formatter could not construct this time-basis projection.",
+     "field": null
+    }
+   ],
+   "time_origin": "first_study_drug_administration_start",
+   "fields_by_table": {
+    "measurements": "nominal_from_observed_dose_time_hours",
+    "exposures": "observed_time_hours"
+   }
+  },
+  "observed_from_predose_pk": {
+   "available": false,
+   "availability_reasons": [
+    {
+     "code": "projection_unavailable",
+     "message": "The formatter could not construct this time-basis projection.",
+     "field": null
+    }
+   ],
+   "time_origin": "first_study_drug_administration_start",
+   "fields_by_table": {
+    "measurements": "observed_from_predose_pk_time_hours",
+    "exposures": "observed_from_predose_pk_time_hours"
+   }
+  }
+ },
+ "study_id": "std_01M1H9KT9GY0YP00KN0JPQBHHB",
+ "treatment_id": "tmt_01M0EJAD0ZXZ7QTQ19X0HS811G"
+}
