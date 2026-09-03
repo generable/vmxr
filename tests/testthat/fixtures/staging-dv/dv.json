@@ -1,5 +1,5 @@
 {
- "data_version_id": "dv_efff48d2b1fb4f919c4d27283ced5956",
+ "data_version_id": "dv_fixture0000000000000000000000000",
  "status": "ready",
  "data_version_number": {
   "major": 1,
@@ -26,14 +26,14 @@
  },
  "pd_markers": [
   {
-   "gen_uuid": "eecd5304-fca2-4f5c-9285-aa713a3e6104",
+   "gen_uuid": "d4fc5ee7-88ba-5402-b9e3-c22cd005dcf2",
    "name": "pdcont",
    "display_name": "pdcont",
    "type": "continuous",
    "unit": "%"
   },
   {
-   "gen_uuid": "bb11d5ed-755e-411f-808c-c9718d5565a2",
+   "gen_uuid": "adeea025-0f58-5491-be5e-9d7da7db4805",
    "name": "pdresp",
    "display_name": "pdresp",
    "type": "binary",
@@ -134,6 +134,6 @@
    }
   }
  },
- "study_id": "std_01M1H9KT9GY0YP00KN0JPQBHHB",
- "treatment_id": "tmt_01M0EJAD0ZXZ7QTQ19X0HS811G"
+ "study_id": "std_FIXTURE000000000000000000000",
+ "treatment_id": "tmt_FIXTURE000000000000000000000"
 }

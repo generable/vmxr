@@ -442,12 +442,15 @@ vmx_nlmixr_doses <- function(dosing, time, cmt) {
     )
   }
   route <- as.character(vmx_nlmixr_optional(dosing, "route"))
-  unknown <- setdiff(unique(route[!is.na(route)]), setdiff(names(cmt), "observation"))
-  if (anyNA(route) || length(unknown)) {
+  known <- setdiff(names(cmt), "observation")
+  bad <- is.na(route) | !route %in% known
+  if (any(bad)) {
+    # Served values stay out of the message (see R/errors.R); the closed
+    # vocabulary the map accepts is package knowledge, so it can be named.
     vmx_abort_response(
       sprintf(
-        "eligible dose rows carry a `route` outside the compartment map (%s).",
-        paste(c(unknown, if (anyNA(route)) "<null>"), collapse = ", ")
+        "%d eligible dose row(s) carry a null `route` or one outside the compartment map (accepted: %s).",
+        sum(bad), paste(known, collapse = ", ")
       ),
       field = "route"
     )
