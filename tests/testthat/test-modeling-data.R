@@ -21,9 +21,15 @@ pk_table <- function() {
 
 test_that("vmx_data_version_table coerces columns by declared type", {
   env <- new.env()
-  httr2::local_mocked_responses(function(req) { env$req <- req; httr2::response_json(body = pk_table()) })
+  httr2::local_mocked_responses(function(req) {
+    env$req <- req
+    if (grepl("/data-versions/dv_1$", req$url)) {
+      # an API 0.2 DataVersion: no time_bases map -> the table is fetched without a basis
+      return(httr2::response_json(body = list(data_version_id = "dv_1", status = "ready")))
+    }
+    httr2::response_json(body = pk_table())
+  })
   tbl <- vmx_data_version_table("dv_1", "pk", client = con)
-  # no recommended basis on the (mocked) DataVersion -> no time_basis parameter
   expect_match(env$req$url, "/data-versions/dv_1/tables/pk$")
   expect_equal(nrow(tbl), 2L)
   expect_type(tbl$time, "double")

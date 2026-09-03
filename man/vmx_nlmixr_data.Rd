@@ -53,7 +53,12 @@ and rxode2 consume directly: one row per dose event and per observation,
 ordered by subject and time.
 }
 \details{
-Columns: \code{ID} (dense integer per subject), \code{TIME} (hours on the selected
+Rows are ordered by subject and time; ties on \code{TIME} are ordered dose
+before observation, which is how rxode2 and nlmixr2 resolve them, so a
+pre-dose sample that shares its time with an IV bolus into the observation
+compartment must carry its own earlier time in the source data.
+
+Columns: \code{ID} (dense integer per subject with admitted rows), \code{TIME} (hours on the selected
 time basis), \code{DV}, \code{AMT} (mg), \code{EVID} (0 observation / 1 dose), \code{MDV}, \code{CMT},
 \code{RATE} (mg/h, > 0 for infusions), \code{II}, \code{ADDL}, \code{SS} (always 0 — the
 DataVersion already expands doses per administration), \code{CENS} / \code{LIMIT}

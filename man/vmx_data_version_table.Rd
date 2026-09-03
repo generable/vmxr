@@ -18,7 +18,9 @@ vmx_data_version_table(
 \code{"covariates"}.}
 
 \item{time_basis}{Optional time basis name (e.g. \code{"observed"}). A basis the
-DataVersion does not list as available is refused client-side.}
+DataVersion does not list as available is refused client-side. Passing it
+with a bare id skips the DataVersion fetch, so the availability check and
+the requirement that a v0.3 server echo the basis then rely on the server.}
 
 \item{client}{A \code{vmx_client}.}
 }

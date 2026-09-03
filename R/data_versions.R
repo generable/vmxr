@@ -95,7 +95,9 @@ vmx_data_version_create <- function(dataset, uploads, prior_config = NULL,
 #' @param domain One of `"subjects"`, `"pk"`, `"dosing"`, `"pd"`, `"labs"`,
 #'   `"covariates"`.
 #' @param time_basis Optional time basis name (e.g. `"observed"`). A basis the
-#'   DataVersion does not list as available is refused client-side.
+#'   DataVersion does not list as available is refused client-side. Passing it
+#'   with a bare id skips the DataVersion fetch, so the availability check and
+#'   the requirement that a v0.3 server echo the basis then rely on the server.
 #' @param client A `vmx_client`.
 #' @return A tibble. The selected basis is attached as the `"time_basis"`
 #'   attribute when one was requested or echoed.
@@ -168,8 +170,10 @@ vmx_resolve_time_basis <- function(dv, time_basis = NULL) {
     time_basis <- vmx_nonempty_strings(time_basis, "time_basis", exactly_one = TRUE)
     if (is.list(bases) && length(bases) && !is.null(names(bases))) {
       entry <- bases[[time_basis]]
-      if (is.null(entry) || !isTRUE(entry$available)) {
-        available <- names(Filter(function(b) is.list(b) && isTRUE(b$available), bases))
+      # v0.3 serves an object per basis; the pre-0.3 shape was a bare boolean.
+      is_available <- function(b) (is.list(b) && isTRUE(b$available)) || isTRUE(b)
+      if (is.null(entry) || !is_available(entry)) {
+        available <- names(Filter(is_available, bases))
         vmx_abort(
           sprintf(
             "Time basis '%s' is not available on this DataVersion (available: %s).",
@@ -187,7 +191,7 @@ vmx_resolve_time_basis <- function(dv, time_basis = NULL) {
   if (is.list(rec)) rec <- rec$value
   if (is.character(rec) && length(rec) == 1L && !is.na(rec) && nzchar(rec)) return(rec)
   if (vmx_dv_has_time_bases(dv)) {
-    available <- names(Filter(function(b) is.list(b) && isTRUE(b$available), bases))
+    available <- names(Filter(function(b) (is.list(b) && isTRUE(b$available)) || isTRUE(b), bases))
     vmx_abort(
       sprintf(
         "This DataVersion recommends no time basis (no basis has PK-eligible subjects); pass `time_basis` explicitly to review it (available: %s).",
