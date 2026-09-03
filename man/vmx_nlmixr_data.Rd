@@ -22,15 +22,17 @@ vmx_nlmixr_data(
 
 \item{time_basis}{Time basis to project on (e.g. \code{"observed"}). Defaults to
 the DataVersion's recommended basis; a basis the DataVersion does not list
-as available is refused.}
+as available is refused, and a DataVersion with no recommended basis needs
+an explicit one.}
 
 \item{eligibility}{Which modeling-eligibility flag admits a row:
 \code{"after_qc"} (default, the contract's admission filter), \code{"before_qc"}, or
-\code{"all"} (no filter — for review only; the result is not analysis-ready).}
+\code{"all"} (no filter). The latter two are for review only.}
 
 \item{pd_markers}{PD markers to include as additional observation endpoints:
-\code{NULL}/\code{FALSE} (default, PK only), \code{TRUE} (every marker in the \code{pd}
-table), or a character vector of marker names.}
+\code{NULL}/\code{FALSE} (default, PK only), \code{TRUE} (every marker the DataVersion
+marks eligible on the selected basis), or a character vector of marker
+names (an explicitly named marker that is ineligible is a usage error).}
 
 \item{cmt}{Named integer vector mapping dosing routes and \code{"observation"} to
 compartments; see \code{\link[=vmx_nlmixr_default_cmt]{vmx_nlmixr_default_cmt()}}. PD markers get compartments
@@ -40,9 +42,9 @@ after the highest mapped value, in the order they are included.}
 }
 \value{
 A tibble in NONMEM layout. The \code{"vmx"} attribute is a list with
-\code{data_version_id}, \code{time_basis}, \code{units}, \code{analyte}, \code{eligibility}, \code{cmt},
-\code{endpoints} (a tibble of \code{dvid}, \code{name}, \code{cmt}, \code{unit}), \code{dropped}
-(named integer counts), and \code{n_subjects}.
+\code{data_version_id}, \code{time_basis}, \code{units}, \code{analyte}, \code{eligibility},
+\code{analysis_ready}, \code{cmt}, \code{endpoints} (a tibble of \code{dvid}, \code{name}, \code{cmt},
+\code{unit}), \code{dropped} (named integer counts), and \code{n_subjects}.
 }
 \description{
 Assembles one event table from a DataVersion's prepared \code{pk}, \code{dosing},
@@ -61,9 +63,13 @@ DataVersion already expands doses per administration), \code{CENS} / \code{LIMIT
 carry 1), \code{subject_id}, and one column per subject-level covariate.
 
 Only rows the DataVersion marks as eligible for modeling are kept; the
-after-QC flag is the contract's mandatory admission filter. Rows dropped by
-eligibility, censoring encoding, or analyte selection are counted in the
-\code{"vmx"} attribute so nothing disappears silently.
+after-QC flag is the contract's mandatory admission filter, and the result
+is analysis-ready only under that default. \code{before_qc} and \code{all} are review
+modes: they warn, mark the result \code{analysis_ready = FALSE}, and drop (with a
+count) any retained-ineligible row that cannot be encoded — a null time, a
+dose without canonical mass, a route outside the compartment map, an infusion
+without a canonical rate. Every dropped-row count is on the \code{"vmx"} attribute
+so nothing disappears silently.
 }
 \seealso{
 \code{\link[=vmx_model_data]{vmx_model_data()}} for the underlying tidy tables.

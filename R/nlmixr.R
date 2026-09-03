@@ -9,10 +9,15 @@
 #     placebo administrations, unconvertible units, QC exclusions, ...) are
 #     removed by that filter, never by this function's own heuristics;
 #   * `time_hours` aliases the selected time basis' hours column;
-#   * `dose_mass` is the canonical administered mass in mg; `dose_rate` (mg/h) and
-#     `dose_duration` (h) describe infusions; `route` is a closed vocabulary;
+#   * `dose_mass` is the canonical administered mass in mg; `dose_rate` (mg/h) is
+#     the server-owned canonical infusion rate; `route` is a closed vocabulary;
 #   * PK `value_float` carries the canonical concentration, `censoring` is
 #     `"BLQ"` / `"ALQ"` / null with the row's `lloq` / `uloq`.
+#
+# Under the default admission rule every one of those fields is guaranteed on an
+# admitted row, so a gap is a served-contract violation (`vmx_response_error`).
+# Under `before_qc` / `all` the same gap is expected on retained-ineligible rows,
+# so such rows are dropped and counted instead.
 
 #' Default route-to-compartment mapping for [vmx_nlmixr_data()]
 #'
@@ -42,30 +47,36 @@ vmx_nlmixr_default_cmt <- function() {
 #' carry 1), `subject_id`, and one column per subject-level covariate.
 #'
 #' Only rows the DataVersion marks as eligible for modeling are kept; the
-#' after-QC flag is the contract's mandatory admission filter. Rows dropped by
-#' eligibility, censoring encoding, or analyte selection are counted in the
-#' `"vmx"` attribute so nothing disappears silently.
+#' after-QC flag is the contract's mandatory admission filter, and the result
+#' is analysis-ready only under that default. `before_qc` and `all` are review
+#' modes: they warn, mark the result `analysis_ready = FALSE`, and drop (with a
+#' count) any retained-ineligible row that cannot be encoded — a null time, a
+#' dose without canonical mass, a route outside the compartment map, an infusion
+#' without a canonical rate. Every dropped-row count is on the `"vmx"` attribute
+#' so nothing disappears silently.
 #'
 #' @param dv A data-version id (`dv_...`) or `vmx_data_version`.
 #' @param analyte PK analyte to assemble, matched against `biomarker_name` or
 #'   `biomarker_code`. Required when the PK table carries more than one analyte.
 #' @param time_basis Time basis to project on (e.g. `"observed"`). Defaults to
 #'   the DataVersion's recommended basis; a basis the DataVersion does not list
-#'   as available is refused.
+#'   as available is refused, and a DataVersion with no recommended basis needs
+#'   an explicit one.
 #' @param eligibility Which modeling-eligibility flag admits a row:
 #'   `"after_qc"` (default, the contract's admission filter), `"before_qc"`, or
-#'   `"all"` (no filter — for review only; the result is not analysis-ready).
+#'   `"all"` (no filter). The latter two are for review only.
 #' @param pd_markers PD markers to include as additional observation endpoints:
-#'   `NULL`/`FALSE` (default, PK only), `TRUE` (every marker in the `pd`
-#'   table), or a character vector of marker names.
+#'   `NULL`/`FALSE` (default, PK only), `TRUE` (every marker the DataVersion
+#'   marks eligible on the selected basis), or a character vector of marker
+#'   names (an explicitly named marker that is ineligible is a usage error).
 #' @param cmt Named integer vector mapping dosing routes and `"observation"` to
 #'   compartments; see [vmx_nlmixr_default_cmt()]. PD markers get compartments
 #'   after the highest mapped value, in the order they are included.
 #' @param client A `vmx_client`.
 #' @return A tibble in NONMEM layout. The `"vmx"` attribute is a list with
-#'   `data_version_id`, `time_basis`, `units`, `analyte`, `eligibility`, `cmt`,
-#'   `endpoints` (a tibble of `dvid`, `name`, `cmt`, `unit`), `dropped`
-#'   (named integer counts), and `n_subjects`.
+#'   `data_version_id`, `time_basis`, `units`, `analyte`, `eligibility`,
+#'   `analysis_ready`, `cmt`, `endpoints` (a tibble of `dvid`, `name`, `cmt`,
+#'   `unit`), `dropped` (named integer counts), and `n_subjects`.
 #' @seealso [vmx_model_data()] for the underlying tidy tables.
 #' @export
 vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
@@ -73,11 +84,18 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
                             pd_markers = NULL, cmt = NULL,
                             client = vmx_client()) {
   eligibility <- match.arg(eligibility)
+  strict <- identical(eligibility, "after_qc")
   cmt <- vmx_nlmixr_cmt_map(cmt)
   if (!is.null(analyte)) {
     analyte <- vmx_nonempty_strings(analyte, "analyte", exactly_one = TRUE)
   }
   pd_selection <- vmx_nlmixr_pd_selection(pd_markers)
+  if (!strict) {
+    cli::cli_warn(c(
+      "!" = "`eligibility = \"{eligibility}\"` admits rows the DataVersion does not mark eligible for modeling.",
+      "i" = "The result is for review only (`analysis_ready = FALSE`); fit models on the default `after_qc` admission."
+    ))
+  }
 
   md <- vmx_model_data(dv, time_basis = time_basis, client = client)
   basis <- md$meta$time_basis
@@ -87,10 +105,16 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
       class = "vmx_usage_error"
     )
   }
+  if (is.null(md$subjects)) {
+    vmx_abort(
+      "The DataVersion has no prepared `subjects` table; it is the contract's subject key for every analytical row.",
+      class = "vmx_usage_error"
+    )
+  }
   dropped <- list()
 
-  # ---- subjects -----------------------------------------------------------
-  subjects <- vmx_nlmixr_subject_map(md$subjects, md$pk, md$dosing)
+  # ---- subjects (the contract's only subject key) --------------------------
+  subjects <- vmx_nlmixr_subject_map(md$subjects)
 
   # ---- PK observations ----------------------------------------------------
   pk <- vmx_nlmixr_admit(md$pk, eligibility, "pk")
@@ -99,21 +123,21 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
   pk_analyte <- vmx_nlmixr_select_analyte(pk, analyte)
   dropped$pk_other_analytes <- nrow(pk) - nrow(pk_analyte$rows)
   pk <- pk_analyte$rows
-  pk_time <- vmx_nlmixr_time_column(pk, basis, "pk")
   pk_obs <- vmx_nlmixr_observations(
     pk,
-    time = pk_time,
+    basis = basis,
     dvid = 1L,
     cmt = unname(cmt[["observation"]]),
-    domain = "pk"
+    domain = "pk",
+    strict = strict
   )
+  dropped$pk_unencodable <- pk_obs$n_dropped
 
   # ---- doses --------------------------------------------------------------
   dosing <- vmx_nlmixr_admit(md$dosing, eligibility, "dosing")
   dropped$dosing_ineligible <- dosing$n_dropped
-  dosing <- dosing$rows
-  dose_time <- vmx_nlmixr_time_column(dosing, basis, "dosing")
-  doses <- vmx_nlmixr_doses(dosing, time = dose_time, cmt = cmt)
+  doses <- vmx_nlmixr_doses(dosing$rows, basis = basis, cmt = cmt, strict = strict)
+  dropped$dosing_unencodable <- doses$n_dropped
 
   # ---- PD endpoints (optional) --------------------------------------------
   endpoints <- tibble::tibble(
@@ -122,7 +146,7 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     cmt = unname(cmt[["observation"]]),
     unit = vmx_nlmixr_unit(pk, md$meta$units$pk_concentration)
   )
-  pd_obs <- NULL
+  pd_parts <- list()
   if (!isFALSE(pd_selection)) {
     if (is.null(md$pd)) {
       vmx_abort(
@@ -133,32 +157,37 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     pd <- vmx_nlmixr_admit(md$pd, eligibility, "pd")
     dropped$pd_ineligible <- pd$n_dropped
     pd <- pd$rows
-    markers <- vmx_nlmixr_pd_markers(pd, pd_selection)
-    pd_time <- vmx_nlmixr_time_column(pd, basis, "pd")
+    marker_sel <- vmx_nlmixr_pd_markers(pd, pd_selection, md$meta, basis, eligibility)
+    dropped$pd_markers_ineligible <- marker_sel$n_dropped
+    keys <- vmx_nlmixr_marker_key(pd)
     next_cmt <- max(cmt)
-    pd_parts <- vector("list", length(markers))
-    for (k in seq_along(markers)) {
-      rows_k <- pd[vmx_nlmixr_marker_key(pd) == markers[[k]], , drop = FALSE]
+    unencodable <- 0L
+    for (k in seq_along(marker_sel$markers)) {
+      marker <- marker_sel$markers[[k]]
+      rows_k <- pd[keys == marker, , drop = FALSE]
       next_cmt <- next_cmt + 1L
-      pd_parts[[k]] <- vmx_nlmixr_observations(
+      obs_k <- vmx_nlmixr_observations(
         rows_k,
-        time = pd_time[vmx_nlmixr_marker_key(pd) == markers[[k]]],
+        basis = basis,
         dvid = 1L + k,
         cmt = next_cmt,
-        domain = "pd"
+        domain = "pd",
+        strict = strict
       )
+      unencodable <- unencodable + obs_k$n_dropped
+      pd_parts[[k]] <- obs_k$rows
       endpoints <- rbind(endpoints, tibble::tibble(
         dvid = 1L + k,
-        name = markers[[k]],
+        name = marker,
         cmt = next_cmt,
         unit = vmx_nlmixr_unit(rows_k, NA_character_)
       ))
     }
-    pd_obs <- do.call(rbind, pd_parts)
+    dropped$pd_unencodable <- unencodable
   }
 
   # ---- assemble -----------------------------------------------------------
-  events <- rbind(pk_obs, doses, pd_obs)
+  events <- do.call(rbind, c(list(pk_obs$rows, doses$rows), pd_parts))
   if (nrow(events) == 0L) {
     vmx_abort(
       "No eligible PK observations or dose events remain for this DataVersion, analyte, and time basis.",
@@ -182,8 +211,8 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     if (length(clash)) {
       vmx_abort(
         sprintf(
-          "Covariate name(s) collide with reserved event columns: %s.",
-          paste(clash, collapse = ", ")
+          "%d covariate name(s) collide with reserved event columns (%s).",
+          length(clash), paste(clash, collapse = ", ")
         ),
         class = "vmx_usage_error"
       )
@@ -193,8 +222,7 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
       events[[nm]] <- covariates[[nm]][idx]
     }
   }
-  extra_subject_cols <- setdiff(names(subjects), c("gen_subject_uuid", "id", "subject_id"))
-  for (nm in extra_subject_cols) {
+  for (nm in setdiff(names(subjects), c("gen_subject_uuid", "id", "subject_id"))) {
     if (!nm %in% names(events)) {
       events[[nm]] <- subjects[[nm]][match(events$gen_subject_uuid, subjects$gen_subject_uuid)]
     }
@@ -209,7 +237,6 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     core <- setdiff(core, "DVID")
   }
   out <- tibble::as_tibble(events[, c(core, setdiff(names(events), c(core, "gen_subject_uuid"))), drop = FALSE])
-  rownames(out) <- NULL
   attr(out, "vmx") <- list(
     data_version_id = md$meta$data_version_id,
     time_basis = basis,
@@ -220,6 +247,7 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     ),
     analyte = pk_analyte$name,
     eligibility = eligibility,
+    analysis_ready = strict,
     cmt = cmt,
     endpoints = endpoints,
     dropped = vapply(dropped, function(x) as.integer(x), integer(1)),
@@ -264,13 +292,21 @@ vmx_nlmixr_flag_column <- function(eligibility) {
 }
 
 # Keep the rows admitted by the selected eligibility flag; count the rest.
+# A table served on a time basis (API 0.3) MUST carry the flags; a table
+# without either is a pre-0.3 server, where only `eligibility = "all"` applies.
 vmx_nlmixr_admit <- function(tbl, eligibility, domain) {
   flag <- vmx_nlmixr_flag_column(eligibility)
   if (is.null(flag)) return(list(rows = tbl, n_dropped = 0L))
   if (!flag %in% names(tbl)) {
+    if (!is.null(attr(tbl, "time_basis"))) {
+      vmx_abort_response(
+        sprintf("the `%s` table is projected on a time basis but has no `%s` column.", domain, flag),
+        field = flag
+      )
+    }
     vmx_abort(
       sprintf(
-        "The `%s` table has no `%s` column; this DataVersion predates the v0.3 eligibility flags. Use `eligibility = \"all\"` to assemble it unfiltered.",
+        "The `%s` table has no `%s` column; this DataVersion predates the v0.3 eligibility flags. Use `eligibility = \"all\"` to assemble it unfiltered (review only).",
         domain, flag
       ),
       class = "vmx_usage_error"
@@ -280,8 +316,19 @@ vmx_nlmixr_admit <- function(tbl, eligibility, domain) {
   list(rows = tbl[keep, , drop = FALSE], n_dropped = sum(!keep))
 }
 
+# The selected basis' time column: `time_hours` aliases it on API 0.3; older
+# tables fall back to the basis-named column (dosing on
+# `nominal_from_observed_dose` projects `observed_time_hours`, schema §11.2).
 vmx_nlmixr_time_column <- function(tbl, basis, domain) {
-  candidates <- c("time_hours", if (!is.null(basis)) paste0(basis, "_time_hours"))
+  candidates <- "time_hours"
+  if (!is.null(basis)) {
+    basis_col <- if (identical(domain, "dosing") && identical(basis, "nominal_from_observed_dose")) {
+      "observed_time_hours"
+    } else {
+      paste0(basis, "_time_hours")
+    }
+    candidates <- c(candidates, basis_col)
+  }
   col <- candidates[candidates %in% names(tbl)][1]
   if (is.na(col)) {
     vmx_abort_response(
@@ -328,28 +375,70 @@ vmx_nlmixr_select_analyte <- function(pk, analyte) {
   list(rows = pk[hit, , drop = FALSE], name = unique(key[hit])[[1]])
 }
 
-vmx_nlmixr_pd_markers <- function(pd, selection) {
+# Markers to include: those requested that exist in the pd table AND that the
+# DataVersion marks eligible on the selected basis (eligibility-spec §9:
+# "Selected PD markers additionally require post-QC modeling eligibility").
+# An explicitly named ineligible marker is a usage error; under `TRUE` it is
+# dropped and counted.
+vmx_nlmixr_pd_markers <- function(pd, selection, meta, basis, eligibility) {
   key <- vmx_nlmixr_marker_key(pd)
   present <- unique(key[!is.na(key)])
-  if (isTRUE(selection)) return(present)
-  missing <- setdiff(selection, present)
+  wanted <- if (isTRUE(selection)) present else selection
+  missing <- setdiff(wanted, present)
   if (length(missing)) {
     vmx_abort(
       sprintf(
-        "PD marker(s) not in the `pd` table: %s (available: %s).",
-        paste(missing, collapse = ", "), paste(present, collapse = ", ")
+        "%d requested PD marker(s) are not in the `pd` table (available: %s).",
+        length(missing), paste(present, collapse = ", ")
       ),
       class = "vmx_usage_error"
     )
   }
-  selection
+  flag <- vmx_nlmixr_flag_column(eligibility)
+  ineligible <- character()
+  if (!is.null(flag)) {
+    marker_flags <- vmx_nlmixr_marker_flags(meta, basis, flag)
+    ineligible <- wanted[!is.na(marker_flags[wanted]) & !marker_flags[wanted]]
+  }
+  if (length(ineligible) && !isTRUE(selection)) {
+    vmx_abort(
+      sprintf(
+        "%d requested PD marker(s) are not eligible for modeling on basis '%s' (%s).",
+        length(ineligible), basis %||% "?", paste(ineligible, collapse = ", ")
+      ),
+      class = "vmx_usage_error"
+    )
+  }
+  list(markers = setdiff(wanted, ineligible), n_dropped = length(ineligible))
 }
 
-# Row-wise numeric value: the typed columns first (`value_float`, then
-# `value_int`), falling back to the untyped `value` where both are null.
+# Named logical vector marker-name -> eligibility flag, from the DataVersion's
+# per-basis `pd_marker_eligibility` (keyed by marker `gen_uuid`) joined to the
+# `pd_markers` manifest. Empty when the DataVersion does not carry them.
+vmx_nlmixr_marker_flags <- function(meta, basis, flag) {
+  out <- logical()
+  manifest <- meta$pd_markers
+  bases <- meta$time_bases
+  if (!is.list(manifest) || !is.list(bases) || is.null(basis) || is.null(bases[[basis]])) return(out)
+  elig <- bases[[basis]]$pd_marker_eligibility
+  if (!is.list(elig) || !length(elig)) return(out)
+  uuid_to_name <- stats::setNames(
+    vapply(manifest, function(m) as.character(m$name %||% NA_character_), character(1)),
+    vapply(manifest, function(m) as.character(m$gen_uuid %||% NA_character_), character(1))
+  )
+  for (entry in elig) {
+    nm <- uuid_to_name[as.character(entry$gen_uuid %||% NA_character_)]
+    if (is.na(nm) || is.null(entry[[flag]])) next
+    out[[nm]] <- isTRUE(entry[[flag]])
+  }
+  out
+}
+
+# Row-wise numeric value from the typed columns only (`value_float`, then
+# `value_int`); the untyped source `value` is not a contract column.
 vmx_nlmixr_value <- function(tbl) {
   out <- rep(NA_real_, nrow(tbl))
-  for (col in c("value_float", "value_int", "value")) {
+  for (col in c("value_float", "value_int")) {
     if (col %in% names(tbl)) {
       vals <- suppressWarnings(as.numeric(tbl[[col]]))
       fill <- is.na(out) & !is.na(vals)
@@ -374,9 +463,18 @@ vmx_nlmixr_optional <- function(tbl, col) {
   if (col %in% names(tbl)) tbl[[col]] else rep(NA, nrow(tbl))
 }
 
+# Enforce a per-row encodability condition: under strict admission a violation
+# is a served-contract violation; otherwise the offending rows are dropped.
+vmx_nlmixr_require <- function(ok, strict, message, field) {
+  if (all(ok)) return(ok)
+  if (strict) vmx_abort_response(message, field = field)
+  ok
+}
+
 # Observation rows (PK or one PD marker) in NONMEM layout.
-vmx_nlmixr_observations <- function(tbl, time, dvid, cmt, domain) {
+vmx_nlmixr_observations <- function(tbl, basis, dvid, cmt, domain, strict) {
   n <- nrow(tbl)
+  time <- vmx_nlmixr_time_column(tbl, basis, domain)
   dv <- vmx_nlmixr_value(tbl)
   cens <- rep(0L, n)
   limit <- rep(NA_real_, n)
@@ -385,31 +483,29 @@ vmx_nlmixr_observations <- function(tbl, time, dvid, cmt, domain) {
   uloq <- as.numeric(vmx_nlmixr_optional(tbl, "uloq"))
   blq <- censoring %in% "BLQ"
   alq <- censoring %in% "ALQ"
-  if (any(blq & is.na(lloq))) {
-    vmx_abort_response(
-      sprintf("a BLQ row in the `%s` table has no `lloq`; the censoring interval cannot be encoded.", domain),
-      field = "lloq"
-    )
-  }
-  if (any(alq & is.na(uloq))) {
-    vmx_abort_response(
-      sprintf("an ALQ row in the `%s` table has no `uloq`; the censoring interval cannot be encoded.", domain),
-      field = "uloq"
-    )
-  }
+  ok <- vmx_nlmixr_require(
+    !is.na(time), strict,
+    sprintf("an admitted `%s` observation has no time on the selected basis.", domain), "time_hours"
+  )
+  ok <- ok & vmx_nlmixr_require(
+    !(blq & is.na(lloq)), strict,
+    sprintf("a BLQ row in the `%s` table has no `lloq`; the censoring interval cannot be encoded.", domain), "lloq"
+  )
+  ok <- ok & vmx_nlmixr_require(
+    !(alq & is.na(uloq)), strict,
+    sprintf("an ALQ row in the `%s` table has no `uloq`; the censoring interval cannot be encoded.", domain), "uloq"
+  )
+  ok <- ok & vmx_nlmixr_require(
+    !(is.na(dv) & !blq & !alq), strict,
+    sprintf("an admitted `%s` observation has no numeric value and no censoring mark.", domain), "value_float"
+  )
   dv[blq] <- lloq[blq]
   cens[blq] <- 1L
   limit[blq] <- 0
   dv[alq] <- uloq[alq]
   cens[alq] <- -1L
   limit[alq] <- Inf
-  if (any(is.na(dv) & !blq & !alq)) {
-    vmx_abort_response(
-      sprintf("an eligible `%s` observation has no numeric value and no censoring mark.", domain),
-      field = "value_float"
-    )
-  }
-  data.frame(
+  rows <- data.frame(
     gen_subject_uuid = as.character(tbl$gen_subject_uuid),
     TIME = time,
     DV = dv,
@@ -426,59 +522,56 @@ vmx_nlmixr_observations <- function(tbl, time, dvid, cmt, domain) {
     DVID = as.integer(dvid),
     stringsAsFactors = FALSE
   )
+  list(rows = rows[ok, , drop = FALSE], n_dropped = sum(!ok))
 }
 
-# Dose rows in NONMEM layout: AMT from canonical dose_mass, RATE for infusions.
-vmx_nlmixr_doses <- function(dosing, time, cmt) {
+# Dose rows in NONMEM layout: AMT from canonical dose_mass, RATE from the
+# server-owned canonical dose_rate (never re-derived from duration).
+vmx_nlmixr_doses <- function(dosing, basis, cmt, strict) {
   n <- nrow(dosing)
   if (!"dose_mass" %in% names(dosing)) {
     vmx_abort_response("the `dosing` table has no `dose_mass` column.", field = "dose_mass")
   }
+  time <- vmx_nlmixr_time_column(dosing, basis, "dosing")
   amt <- as.numeric(dosing$dose_mass)
-  if (anyNA(amt)) {
-    vmx_abort_response(
-      "an eligible dose has no canonical `dose_mass`; the contract requires it on eligible rows.",
-      field = "dose_mass"
-    )
-  }
   route <- as.character(vmx_nlmixr_optional(dosing, "route"))
   known <- setdiff(names(cmt), "observation")
-  bad <- is.na(route) | !route %in% known
-  if (any(bad)) {
-    # Served values stay out of the message (see R/errors.R); the closed
-    # vocabulary the map accepts is package knowledge, so it can be named.
-    vmx_abort_response(
-      sprintf(
-        "%d eligible dose row(s) carry a null `route` or one outside the compartment map (accepted: %s).",
-        sum(bad), paste(known, collapse = ", ")
-      ),
-      field = "route"
-    )
-  }
+  route_ok <- !is.na(route) & route %in% known
+  infusion <- route_ok & route == "iv-infusion"
+  dose_rate <- as.numeric(vmx_nlmixr_optional(dosing, "dose_rate"))
+  ok <- vmx_nlmixr_require(
+    !is.na(time), strict,
+    "an admitted dose has no time on the selected basis.", "time_hours"
+  )
+  ok <- ok & vmx_nlmixr_require(
+    !is.na(amt), strict,
+    "an admitted dose has no canonical `dose_mass`; the contract requires it on eligible rows.", "dose_mass"
+  )
+  ok <- ok & vmx_nlmixr_require(
+    route_ok, strict,
+    sprintf(
+      "%d admitted dose row(s) carry a null `route` or one outside the compartment map (accepted: %s).",
+      sum(!route_ok), paste(known, collapse = ", ")
+    ),
+    "route"
+  )
+  ok <- ok & vmx_nlmixr_require(
+    !(infusion & (is.na(dose_rate) | dose_rate <= 0)), strict,
+    "an admitted `iv-infusion` dose has no positive canonical `dose_rate`; the contract requires it on eligible infusion rows.",
+    "dose_rate"
+  )
   rate <- rep(0, n)
-  infusion <- route == "iv-infusion"
-  if (any(infusion)) {
-    dose_rate <- as.numeric(vmx_nlmixr_optional(dosing, "dose_rate"))
-    duration <- as.numeric(vmx_nlmixr_optional(dosing, "dose_duration"))
-    from_rate <- infusion & !is.na(dose_rate) & dose_rate > 0
-    from_duration <- infusion & !from_rate & !is.na(duration) & duration > 0
-    rate[from_rate] <- dose_rate[from_rate]
-    rate[from_duration] <- amt[from_duration] / duration[from_duration]
-    if (any(infusion & !from_rate & !from_duration)) {
-      vmx_abort_response(
-        "an eligible `iv-infusion` dose has neither `dose_rate` nor `dose_duration`; RATE cannot be derived.",
-        field = "dose_rate"
-      )
-    }
-  }
-  data.frame(
+  rate[infusion] <- dose_rate[infusion]
+  cmt_idx <- rep(NA_integer_, n)
+  cmt_idx[route_ok] <- as.integer(unname(cmt[route[route_ok]]))
+  rows <- data.frame(
     gen_subject_uuid = as.character(dosing$gen_subject_uuid),
     TIME = time,
     DV = NA_real_,
     AMT = amt,
     EVID = 1L,
     MDV = 1L,
-    CMT = as.integer(unname(cmt[route])),
+    CMT = cmt_idx,
     RATE = rate,
     II = 0,
     ADDL = 0L,
@@ -490,29 +583,21 @@ vmx_nlmixr_doses <- function(dosing, time, cmt) {
     DVID = 1L,
     stringsAsFactors = FALSE
   )
+  list(rows = rows[ok, , drop = FALSE], n_dropped = sum(!ok))
 }
 
-# Dense integer IDs plus the human subject_id, arm and dose_group when served.
-vmx_nlmixr_subject_map <- function(subjects, pk, dosing) {
-  uuids <- character()
-  ids <- character()
-  if (!is.null(subjects) && "gen_subject_uuid" %in% names(subjects)) {
-    uuids <- as.character(subjects$gen_subject_uuid)
-    ids <- if ("subject_id" %in% names(subjects)) as.character(subjects$subject_id) else uuids
+# Dense integer IDs from the subjects table (the contract's subject key),
+# plus the human subject_id and the arm / dose_group descriptors when served.
+vmx_nlmixr_subject_map <- function(subjects) {
+  if (!"gen_subject_uuid" %in% names(subjects)) {
+    vmx_abort_response("the `subjects` table has no `gen_subject_uuid` column.", field = "gen_subject_uuid")
   }
-  seen <- unique(c(as.character(pk$gen_subject_uuid), as.character(dosing$gen_subject_uuid)))
-  extra <- setdiff(seen, uuids)
-  if (length(extra)) {
-    from_rows <- rbind(
-      if ("subject_id" %in% names(pk)) data.frame(u = as.character(pk$gen_subject_uuid), s = as.character(pk$subject_id)) else NULL,
-      if ("subject_id" %in% names(dosing)) data.frame(u = as.character(dosing$gen_subject_uuid), s = as.character(dosing$subject_id)) else NULL
-    )
-    uuids <- c(uuids, extra)
-    ids <- c(ids, vapply(extra, function(u) {
-      s <- if (!is.null(from_rows)) from_rows$s[match(u, from_rows$u)] else NA_character_
-      if (is.na(s)) u else s
-    }, character(1), USE.NAMES = FALSE))
+  uuids <- as.character(subjects$gen_subject_uuid)
+  if (anyDuplicated(uuids)) {
+    vmx_abort_response("the `subjects` table repeats a `gen_subject_uuid`.", field = "gen_subject_uuid")
   }
+  ids <- if ("subject_id" %in% names(subjects)) as.character(subjects$subject_id) else uuids
+  ids[is.na(ids)] <- uuids[is.na(ids)]
   ord <- order(suppressWarnings(as.numeric(ids)), ids, na.last = TRUE)
   map <- data.frame(
     gen_subject_uuid = uuids[ord],
@@ -520,15 +605,15 @@ vmx_nlmixr_subject_map <- function(subjects, pk, dosing) {
     id = seq_along(ord),
     stringsAsFactors = FALSE
   )
-  if (!is.null(subjects)) {
-    for (nm in intersect(c("arm", "dose_group"), names(subjects))) {
-      map[[nm]] <- as.character(subjects[[nm]])[match(map$gen_subject_uuid, subjects$gen_subject_uuid)]
-    }
+  for (nm in intersect(c("arm", "dose_group"), names(subjects))) {
+    map[[nm]] <- as.character(subjects[[nm]])[match(map$gen_subject_uuid, uuids)]
   }
   map
 }
 
-# Long covariate rows -> one typed column per covariate name, per subject.
+# Long covariate rows -> one column per covariate name, per subject, typed by
+# the served `type` (schema §10.6): categorical/string -> `value_str`,
+# otherwise the numeric typed columns.
 vmx_nlmixr_covariates <- function(covariates, eligibility) {
   if (is.null(covariates) || nrow(covariates) == 0L || !"name" %in% names(covariates)) return(NULL)
   flag <- vmx_nlmixr_flag_column(eligibility)
@@ -537,16 +622,21 @@ vmx_nlmixr_covariates <- function(covariates, eligibility) {
   }
   subjects <- unique(as.character(covariates$gen_subject_uuid))
   out <- data.frame(gen_subject_uuid = subjects, stringsAsFactors = FALSE)
+  types <- as.character(vmx_nlmixr_optional(covariates, "type"))
   for (nm in unique(as.character(covariates$name))) {
-    rows <- covariates[covariates$name == nm, , drop = FALSE]
-    num <- vmx_nlmixr_value(rows)
-    chr <- as.character(vmx_nlmixr_optional(rows, "value_str"))
-    values <- if (all(is.na(num)) && any(!is.na(chr))) chr else num
+    sel <- covariates$name == nm
+    rows <- covariates[sel, , drop = FALSE]
     if (anyDuplicated(rows$gen_subject_uuid)) {
       vmx_abort_response(
         sprintf("covariate '%s' has more than one value for a subject.", nm),
         field = "covariates"
       )
+    }
+    textual <- any(types[sel] %in% c("categorical", "string", "boolean", "binary"))
+    values <- if (textual) {
+      as.character(vmx_nlmixr_optional(rows, "value_str"))
+    } else {
+      vmx_nlmixr_value(rows)
     }
     out[[nm]] <- values[match(subjects, as.character(rows$gen_subject_uuid))]
   }

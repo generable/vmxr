@@ -86,8 +86,10 @@ vmx_data_version_create <- function(dataset, uploads, prior_config = NULL,
 #' API 0.3 projects every analytical table on a time basis and requires the
 #' `time_basis` query parameter. When `time_basis` is `NULL`, the
 #' DataVersion's recommended basis is used (fetching the DataVersion first if
-#' only an id was given); a DataVersion that advertises no recommended basis
-#' (an API 0.2 server) is fetched without the parameter.
+#' only an id was given). A v0.3 DataVersion with no recommended basis (no
+#' basis has PK-eligible subjects) needs an explicit `time_basis`; only a
+#' DataVersion without a `time_bases` map (an API 0.2 server) is fetched
+#' without the parameter.
 #'
 #' @param dv A data-version id (`dv_...`) or `vmx_data_version`.
 #' @param domain One of `"subjects"`, `"pk"`, `"dosing"`, `"pd"`, `"labs"`,
@@ -125,15 +127,30 @@ vmx_data_version_table <- function(dv, domain = c("subjects", "pk", "dosing", "p
     )
   }
   echoed <- tbl[["time_basis"]]
-  if (!is.null(basis) && !is.null(echoed) && !identical(echoed, basis)) {
-    vmx_abort_response(
-      "data-version table field 'time_basis' does not match the requested basis.",
-      field = "time_basis"
-    )
+  if (!is.null(basis)) {
+    if (is.null(echoed) && vmx_dv_has_time_bases(dv)) {
+      vmx_abort_response(
+        "data-version table did not echo the requested 'time_basis'.",
+        field = "time_basis"
+      )
+    }
+    if (!is.null(echoed) && !identical(echoed, basis)) {
+      vmx_abort_response(
+        "data-version table field 'time_basis' does not match the requested basis.",
+        field = "time_basis"
+      )
+    }
   }
   out <- vmx_dvtable_to_tibble(tbl)
   attr(out, "time_basis") <- echoed %||% basis
   out
+}
+
+# TRUE when the DataVersion carries the v0.3 per-basis map (a named, non-empty
+# `time_bases` object) — the marker that time-basis projection is in force.
+vmx_dv_has_time_bases <- function(dv) {
+  bases <- if (inherits(dv, "vmx_resource")) dv$time_bases else NULL
+  is.list(bases) && length(bases) > 0L && !is.null(names(bases))
 }
 
 #' Resolve the time basis to request for a DataVersion's tables
@@ -168,7 +185,18 @@ vmx_resolve_time_basis <- function(dv, time_basis = NULL) {
   if (!inherits(dv, "vmx_resource")) return(NULL)
   rec <- dv$recommended_time_basis
   if (is.list(rec)) rec <- rec$value
-  if (is.character(rec) && length(rec) == 1L && !is.na(rec) && nzchar(rec)) rec else NULL
+  if (is.character(rec) && length(rec) == 1L && !is.na(rec) && nzchar(rec)) return(rec)
+  if (vmx_dv_has_time_bases(dv)) {
+    available <- names(Filter(function(b) is.list(b) && isTRUE(b$available), bases))
+    vmx_abort(
+      sprintf(
+        "This DataVersion recommends no time basis (no basis has PK-eligible subjects); pass `time_basis` explicitly to review it (available: %s).",
+        if (length(available)) paste(available, collapse = ", ") else "none"
+      ),
+      class = "vmx_usage_error"
+    )
+  }
+  NULL
 }
 
 #' Export a data version
