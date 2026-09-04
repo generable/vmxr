@@ -200,7 +200,8 @@ nlmixr_mock <- function(log = new.env(),
                           subjects = nlmixr_subjects_body(), pk = nlmixr_pk_body(),
                           dosing = nlmixr_dosing_body(), pd = nlmixr_pd_body(),
                           covariates = nlmixr_covariates_body()
-                        )) {
+                        ),
+                        echo = TRUE) {
   log$requests <- character()
   function(req) {
     log$requests <- c(log$requests, req$url)
@@ -217,7 +218,8 @@ nlmixr_mock <- function(log = new.env(),
     }
     # echo the requested basis like API 0.3; omit it like API 0.2 when none was sent
     basis <- if (grepl("time_basis=", req$url)) sub("^.*time_basis=([^&]+).*$", "\\1", req$url) else NULL
-    body$time_basis <- basis
+    # `echo = FALSE` models API 0.2.2 as deployed: the parameter is ignored, nothing echoed
+    body$time_basis <- if (echo) basis else NULL
     httr2::response_json(body = body)
   }
 }
