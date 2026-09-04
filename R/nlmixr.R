@@ -263,6 +263,7 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     ),
     analyte = pk_analyte$name,
     eligibility = eligibility,
+    eligibility_flag = pk$flag %||% dosing$flag,
     analysis_ready = strict,
     cmt = cmt,
     endpoints = endpoints,
@@ -308,13 +309,20 @@ vmx_nlmixr_flag_column <- function(eligibility) {
 }
 
 # Keep the rows admitted by the selected eligibility flag; count the rest.
-# A table served on a time basis (API 0.3) MUST carry the flags; a table
-# without either is a pre-0.3 server, where only `eligibility = "all"` applies.
+# A table whose basis the server echoed (API 0.3 / the 0.2.x hotfix line) MUST
+# carry a flag; a flat canonical table (API 0.2.2 without the hotfix) has none,
+# and only `eligibility = "all"` applies there.
 vmx_nlmixr_admit <- function(tbl, eligibility, domain) {
   flag <- vmx_nlmixr_flag_column(eligibility)
-  if (is.null(flag)) return(list(rows = tbl, n_dropped = 0L))
+  if (is.null(flag)) return(list(rows = tbl, n_dropped = 0L, flag = NULL))
+  if (!flag %in% names(tbl) && "eligible_for_modeling" %in% names(tbl)) {
+    # Pre-QC-contract DataVersions (the API 0.2.x per-basis exports) carry a single
+    # `eligible_for_modeling` flag; it is the admission filter of that line for both
+    # the before- and after-QC modes.
+    flag <- "eligible_for_modeling"
+  }
   if (!flag %in% names(tbl)) {
-    if (!is.null(attr(tbl, "time_basis"))) {
+    if (isTRUE(attr(tbl, "basis_echoed"))) {
       vmx_abort_response(
         sprintf("the `%s` table is projected on a time basis but has no `%s` column.", domain, flag),
         field = flag
@@ -329,7 +337,7 @@ vmx_nlmixr_admit <- function(tbl, eligibility, domain) {
     )
   }
   keep <- tbl[[flag]] %in% TRUE
-  list(rows = tbl[keep, , drop = FALSE], n_dropped = sum(!keep))
+  list(rows = tbl[keep, , drop = FALSE], n_dropped = sum(!keep), flag = flag)
 }
 
 # The selected basis' time column: `time_hours` aliases it on API 0.3; older

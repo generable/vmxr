@@ -88,8 +88,10 @@ vmx_data_version_create <- function(dataset, uploads, prior_config = NULL,
 #' DataVersion's recommended basis is used (fetching the DataVersion first if
 #' only an id was given). A v0.3 DataVersion with no recommended basis (no
 #' basis has PK-eligible subjects) needs an explicit `time_basis`; only a
-#' DataVersion without a `time_bases` map (an API 0.2 server) is fetched
-#' without the parameter.
+#' DataVersion without a `time_bases` map (an older API 0.2 server) is fetched
+#' without the parameter. An API 0.2.2 server that advertises `time_bases` but
+#' ignores the parameter serves the flat canonical table; the result then
+#' carries `"basis_echoed" = FALSE` and the basis-named time columns.
 #'
 #' @param dv A data-version id (`dv_...`) or `vmx_data_version`.
 #' @param domain One of `"subjects"`, `"pk"`, `"dosing"`, `"pd"`, `"labs"`,
@@ -130,7 +132,12 @@ vmx_data_version_table <- function(dv, domain = c("subjects", "pk", "dosing", "p
   }
   echoed <- tbl[["time_basis"]]
   if (!is.null(basis)) {
-    if (is.null(echoed) && vmx_dv_has_time_bases(dv)) {
+    # API 0.3 (object-shaped `time_bases`) MUST echo the basis it projected on; a
+    # pre-0.3 server (boolean-shaped map, API 0.2.x) may ignore the parameter and
+    # serve the flat canonical table — no `time_hours` alias, no eligibility flags.
+    # The 0.2.x hotfix line echoes like 0.3. Record which one we got so the
+    # assemblers can adapt.
+    if (is.null(echoed) && vmx_dv_time_bases_v03(dv)) {
       vmx_abort_response(
         "data-version table did not echo the requested 'time_basis'.",
         field = "time_basis"
@@ -145,11 +152,19 @@ vmx_data_version_table <- function(dv, domain = c("subjects", "pk", "dosing", "p
   }
   out <- vmx_dvtable_to_tibble(tbl)
   attr(out, "time_basis") <- echoed %||% basis
+  attr(out, "basis_echoed") <- !is.null(echoed)
   out
 }
 
-# TRUE when the DataVersion carries the v0.3 per-basis map (a named, non-empty
-# `time_bases` object) — the marker that time-basis projection is in force.
+# TRUE when the `time_bases` map is the v0.3 shape: an object per basis (with
+# `available`, ...). The pre-0.3 shape is a bare boolean per basis.
+vmx_dv_time_bases_v03 <- function(dv) {
+  bases <- if (inherits(dv, "vmx_resource")) dv$time_bases else NULL
+  vmx_dv_has_time_bases(dv) && any(vapply(bases, is.list, logical(1)))
+}
+
+# TRUE when the DataVersion carries a per-basis map (a named, non-empty
+# `time_bases` object, either shape) — the marker that a basis is requested.
 vmx_dv_has_time_bases <- function(dv) {
   bases <- if (inherits(dv, "vmx_resource")) dv$time_bases else NULL
   is.list(bases) && length(bases) > 0L && !is.null(names(bases))
