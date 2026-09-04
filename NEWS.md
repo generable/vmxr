@@ -1,4 +1,14 @@
-# vmxr (development version)
+# vmxr 0.3.0
+
+* Table fetching and `vmx_nlmixr_data()` work against both the API 0.3 shape
+  and the API 0.2.2 shape deployed on the arv workspaces (AGE-69). A server that
+  advertises `time_bases` but ignores the `time_basis` parameter is no longer
+  refused: the result records `"basis_echoed" = FALSE` and the assembler
+  falls back to the basis-named time column. When the before/after-QC
+  eligibility pair is absent, the single `eligible_for_modeling` flag (the
+  0.2.x per-basis exports) is the admission filter; the applied column is
+  recorded as `attr(x, "vmx")$eligibility_flag`. A flat canonical table with no
+  flag still requires `eligibility = "all"`.
 
 * `vmx_nlmixr_data()` is implemented (AGE-64). It assembles the NONMEM-layout
   event dataset nlmixr2 / rxode2 consume — `ID`, `TIME`, `DV`, `AMT`, `EVID`,

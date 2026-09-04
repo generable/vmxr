@@ -457,3 +457,85 @@ test_that("a recorded API 0.3 DataVersion fits a one-compartment model in nlmixr
   expect_s3_class(fit, "nlmixr2FitCore")
   expect_true(is.finite(fit$objf))
 })
+
+
+# --- API 0.2.2 as deployed on the arv workspaces (AGE-69) ------------------------------
+# The DataVersion advertises a boolean `time_bases` map and an object recommendation, but
+# the table endpoint ignores `time_basis` (no echo) and serves the flat canonical table:
+# basis-named time columns, no `time_hours`, no eligibility flags. With the AGE-68 server
+# hotfix the per-basis export is served instead: echoed basis + a single
+# `eligible_for_modeling` flag.
+
+nlmixr_022_dv_body <- function() {
+  body <- nlmixr_dv_body()
+  body$time_bases <- list(observed = TRUE, nominal = FALSE)
+  body
+}
+
+# canonical-shaped tables: drop the alias + the QC flag pair, keep the basis-named column
+nlmixr_022_canonical <- function(body, single_flag = FALSE) {
+  body$rows <- lapply(body$rows, function(r) {
+    if (!is.null(r$time_hours)) r$observed_time_hours <- r$time_hours
+    r$time_hours <- NULL
+    r$time_basis <- NULL
+    if (single_flag) r$eligible_for_modeling <- r$eligible_for_modeling_after_qc
+    r$eligible_for_modeling_before_qc <- NULL
+    r$eligible_for_modeling_after_qc <- NULL
+    r$qc_excluded <- NULL
+    r
+  })
+  keep <- vapply(body$columns, function(c) !c$name %in% c("time_hours", "time_basis",
+    "eligible_for_modeling_before_qc", "eligible_for_modeling_after_qc", "qc_excluded"), logical(1))
+  body$columns <- body$columns[keep]
+  has_col <- function(name) any(vapply(body$columns, function(c) identical(c$name, name), logical(1)))
+  if (!has_col("observed_time_hours") &&
+      any(vapply(body$rows, function(r) !is.null(r$observed_time_hours), logical(1)))) {
+    body$columns <- c(body$columns, list(nlmixr_col("observed_time_hours", "number")))
+  }
+  if (single_flag) body$columns <- c(body$columns, list(nlmixr_col("eligible_for_modeling", "boolean")))
+  body
+}
+
+test_that("an API 0.2.2 server that ignores time_basis is not refused; canonical needs eligibility = 'all'", {
+  tables <- list(
+    subjects = nlmixr_022_canonical(nlmixr_subjects_body()), pk = nlmixr_022_canonical(nlmixr_pk_body()),
+    dosing = nlmixr_022_canonical(nlmixr_dosing_body()), pd = nlmixr_022_canonical(nlmixr_pd_body()),
+    covariates = nlmixr_022_canonical(nlmixr_covariates_body())
+  )
+  log <- new.env()
+  httr2::local_mocked_responses(nlmixr_mock(log, dv = nlmixr_022_dv_body(), tables = tables, echo = FALSE))
+  # the basis is still requested (the DataVersion advertises it) ...
+  tbl <- vmx_pk("dv_1", client = con)
+  expect_match(log$requests[[2]], "time_basis=observed$")
+  # ... but the server did not echo it: recorded, not refused
+  expect_equal(attr(tbl, "time_basis"), "observed")
+  expect_false(attr(tbl, "basis_echoed"))
+  # no flags on the canonical table -> the default admission filter is a usage error
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con), class = "vmx_usage_error")
+  ev <- suppressWarnings(vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "all", client = con))
+  expect_equal(sort(unique(ev$ID)), 1:3)
+  expect_equal(attr(ev, "vmx")$time_basis, "observed")
+  expect_null(attr(ev, "vmx")$eligibility_flag)
+})
+
+test_that("the 0.2.x per-basis export (echoed basis, single eligible_for_modeling flag) is admitted on it", {
+  tables <- list(
+    subjects = nlmixr_022_canonical(nlmixr_subjects_body(), single_flag = TRUE),
+    pk = nlmixr_022_canonical(nlmixr_pk_body(), single_flag = TRUE),
+    dosing = nlmixr_022_canonical(nlmixr_dosing_body(), single_flag = TRUE),
+    pd = nlmixr_022_canonical(nlmixr_pd_body(), single_flag = TRUE),
+    covariates = nlmixr_022_canonical(nlmixr_covariates_body(), single_flag = TRUE)
+  )
+  httr2::local_mocked_responses(nlmixr_mock(dv = nlmixr_022_dv_body(), tables = tables))
+  ev <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)
+  ref <- {
+    httr2::local_mocked_responses(nlmixr_mock())
+    vmx_nlmixr_data("dv_1", analyte = "drug", client = con)
+  }
+  expect_equal(attr(ev, "vmx")$eligibility_flag, "eligible_for_modeling")
+  expect_equal(attr(ref, "vmx")$eligibility_flag, "eligible_for_modeling_after_qc")
+  expect_equal(nrow(ev), nrow(ref))
+  expect_equal(ev$ID, ref$ID)
+  expect_equal(ev$TIME, ref$TIME)
+  expect_equal(ev$AMT, ref$AMT)
+})
