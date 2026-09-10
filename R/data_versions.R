@@ -1,24 +1,124 @@
 # Data versions — curated, model-ready data plus the modeling access layer.
 
 #' List data versions
+#'
+#' The modeling-eligibility filter maps onto whichever query param the served
+#' API contract accepts. The 0.2.2 API filters on a single basis-agnostic
+#' `eligible_for_modeling` boolean; the 0.3 API replaced it with the
+#' basis-scoped `pk_eligible_for_modeling_after_qc` filter, which requires a
+#' companion `time_basis` (api-contract §5.4). Because a 0.3 server *silently
+#' drops* the unknown 0.2.2 param and returns the full unfiltered list, the
+#' served shape is detected first — from `/health`'s `api_contract_version`
+#' (§5.13) — and the filter is mapped accordingly; a 0.3 server asked to filter
+#' without a `time_basis` errors rather than returning an unfiltered list.
+#'
 #' @param treatment Optional treatment filter.
 #' @param study Optional study filter.
 #' @param include_archived Include archived versions.
-#' @param eligible_for_modeling Optional modeling-eligibility filter.
+#' @param eligible_for_modeling Optional modeling-eligibility filter (`TRUE` /
+#'   `FALSE`). Against a 0.3 server it selects DataVersions eligible for
+#'   modeling after QC on `time_basis`; against 0.2.2 it is the basis-agnostic
+#'   flag.
+#' @param time_basis Optional time basis (`"observed"`, `"nominal"`, or
+#'   `"nominal_from_observed_dose"`). Required alongside `eligible_for_modeling`
+#'   when the server serves the 0.3 contract; ignored by (and not sent to) a
+#'   0.2.2 server.
 #' @param client A `vmx_client`.
 #' @return A tibble containing all matching data versions.
 #' @export
 vmx_data_versions <- function(treatment = NULL, study = NULL,
                               include_archived = FALSE,
                               eligible_for_modeling = NULL,
+                              time_basis = NULL,
                               client = vmx_client()) {
   params <- list(
     treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
     study_id = vmx_opt_id(study, "std", "study"),
-    include_archived = include_archived,
-    eligible_for_modeling = eligible_for_modeling
+    include_archived = include_archived
   )
+  params <- c(params, vmx_data_versions_eligibility_query(
+    eligible_for_modeling, time_basis, client
+  ))
   vmx_paginate(client, "/data-versions", params)
+}
+
+# Map the modeling-eligibility filter onto the query params the *served* API
+# shape accepts (AGE-78). 0.2.2 filters on the flat `eligible_for_modeling`
+# boolean; 0.3 replaced it with the basis-scoped `pk_eligible_for_modeling_*_qc`
+# pair, each requiring a `time_basis` (api-contract §5.4). `eligible_for_modeling
+# = TRUE` maps to `pk_eligible_for_modeling_after_qc=true` — the same after-QC
+# admission flag `vmx_nlmixr_data()` defaults to. A 0.3 server silently ignores
+# the unknown 0.2.2 param and returns the full list, so we branch on the served
+# shape rather than send-and-hope.
+#' @keywords internal
+#' @noRd
+vmx_data_versions_eligibility_query <- function(eligible_for_modeling,
+                                                time_basis, client) {
+  if (is.null(eligible_for_modeling)) {
+    if (!is.null(time_basis)) {
+      vmx_abort(
+        paste0(
+          "`time_basis` filters the data-version list only together with ",
+          "`eligible_for_modeling`; pass `eligible_for_modeling` too or drop ",
+          "`time_basis`."
+        ),
+        class = "vmx_usage_error"
+      )
+    }
+    return(list())
+  }
+  if (!is.logical(eligible_for_modeling) ||
+      length(eligible_for_modeling) != 1L || is.na(eligible_for_modeling)) {
+    vmx_abort(
+      "`eligible_for_modeling` must be TRUE, FALSE, or NULL.",
+      class = "vmx_usage_error"
+    )
+  }
+  if (!vmx_server_uses_basis_eligibility(client)) {
+    # 0.2.2: the basis-agnostic boolean, exactly as before. `time_basis` has no
+    # meaning on this shape and is not forwarded, so a request without it stays
+    # byte-identical to the pre-AGE-78 client.
+    return(list(eligible_for_modeling = eligible_for_modeling))
+  }
+  # 0.3: basis-scoped filter. `time_basis` is mandatory here — omitting it would
+  # 422 server-side, and falling back to the 0.2.2 param would be silently
+  # dropped — so fail loudly client-side instead of returning an unfiltered list.
+  if (is.null(time_basis)) {
+    vmx_abort(
+      paste0(
+        "This VeloMetrix server serves the v0.3 API, which filters modeling ",
+        "eligibility per time basis, so `eligible_for_modeling` requires a ",
+        "`time_basis` (one of \"observed\", \"nominal\", ",
+        "\"nominal_from_observed_dose\")."
+      ),
+      class = "vmx_usage_error"
+    )
+  }
+  time_basis <- vmx_nonempty_strings(time_basis, "time_basis", exactly_one = TRUE)
+  list(
+    pk_eligible_for_modeling_after_qc = eligible_for_modeling,
+    time_basis = time_basis
+  )
+}
+
+# TRUE when the connected server serves the v0.3 API contract (>= 0.3), i.e. it
+# uses the basis-scoped `pk_eligible_for_modeling_*_qc` list filters rather than
+# the flat 0.2.2 `eligible_for_modeling` one. Read from `/health`'s
+# `api_contract_version` — the field the contract designates for confirming
+# which contract a deployment exposes (api-contract §5.13). Per the additive-
+# field rule there, a pre-0.3 deployment omits the field or returns "" (and an
+# unparseable value degrades the same way), all of which we read as the legacy
+# flat-filter shape.
+#' @keywords internal
+#' @noRd
+vmx_server_uses_basis_eligibility <- function(client) {
+  health <- vmx_get(client, "/health")
+  ver <- if (is.list(health)) health[["api_contract_version"]] else NULL
+  if (!is.character(ver) || length(ver) != 1L || is.na(ver) || !nzchar(ver)) {
+    return(FALSE)
+  }
+  parsed <- tryCatch(numeric_version(ver), error = function(e) NULL)
+  !is.null(parsed) && parsed >= numeric_version("0.3")
 }
 
 #' Fetch one data version
