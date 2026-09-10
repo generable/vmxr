@@ -391,6 +391,10 @@ vmx_nca_result_paged <- function(res, nca_id, client) {
 
   if (length(rows)) {
     out <- vctrs::vec_rbind(!!!rows)
+    # Order by item_index (stable radix sort on the integer key preserves the
+    # per-subject order within an item). The contract guarantees ascending order
+    # across pages; sorting keeps the result correct even if a server violates it.
+    out <- out[order(out$item_index), , drop = FALSE]
     lead <- c(
       "item_index", "label", "interval_start_hours", "interval_end_hours",
       "subject_id", "gen_subject_uuid"
