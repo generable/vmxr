@@ -1,0 +1,24 @@
+{
+  "data_version_id": "dv_1",
+  "domain": "dosing",
+  "time_basis": "observed",
+  "columns": [
+    { "name": "gen_subject_uuid", "type": "string" },
+    { "name": "subject_id", "type": "string" },
+    { "name": "observed_time_hours", "type": "number" },
+    { "name": "dose_amount", "type": "number", "unit": "mg" },
+    { "name": "dose_amount_unit", "type": "string" },
+    { "name": "dose_mass", "type": "number", "unit": "mg" },
+    { "name": "dose_mass_unit", "type": "string" },
+    { "name": "dose_rate", "type": "number", "unit": "mg/h" },
+    { "name": "dose_duration", "type": "number", "unit": "h" },
+    { "name": "route", "type": "string" },
+    { "name": "eligible_for_modeling", "type": "boolean" }
+  ],
+  "rows": [
+    { "gen_subject_uuid": "u1", "subject_id": "S1", "observed_time_hours": 0, "dose_amount": 100, "dose_amount_unit": "mg", "dose_mass": 100, "dose_mass_unit": "mg", "dose_rate": null, "dose_duration": null, "route": "po", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u1", "subject_id": "S1", "observed_time_hours": 24, "dose_amount": 100, "dose_amount_unit": "mg", "dose_mass": 100, "dose_mass_unit": "mg", "dose_rate": null, "dose_duration": null, "route": "po", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u2", "subject_id": "S2", "observed_time_hours": 0, "dose_amount": 50, "dose_amount_unit": "mg", "dose_mass": 50, "dose_mass_unit": "mg", "dose_rate": 25, "dose_duration": 2, "route": "iv-infusion", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u3", "subject_id": "S3", "observed_time_hours": 0, "dose_amount": 0, "dose_amount_unit": "mg", "dose_mass": 0, "dose_mass_unit": "mg", "dose_rate": null, "dose_duration": null, "route": "po", "eligible_for_modeling": false }
+  ]
+}

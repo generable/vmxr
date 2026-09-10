@@ -1,0 +1,17 @@
+{
+  "data_version_id": "dv_1",
+  "domain": "subjects",
+  "time_basis": "observed",
+  "columns": [
+    { "name": "gen_subject_uuid", "type": "string" },
+    { "name": "subject_id", "type": "string" },
+    { "name": "arm", "type": "string" },
+    { "name": "dose_group", "type": "string" },
+    { "name": "eligible_for_modeling", "type": "boolean" }
+  ],
+  "rows": [
+    { "gen_subject_uuid": "u3", "subject_id": "S3", "arm": "placebo", "dose_group": "0 mg", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u1", "subject_id": "S1", "arm": "active", "dose_group": "100 mg", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u2", "subject_id": "S2", "arm": "active", "dose_group": "50 mg iv", "eligible_for_modeling": true }
+  ]
+}

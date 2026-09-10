@@ -64,9 +64,12 @@ nlmixr_dv_body <- function(recommended = list(value = "observed", reason = "only
   )
 }
 
-# A DataVersion as an API 0.2 server describes it: no time_bases map, no
-# recommended basis, and tables served without eligibility flags or a basis echo.
-nlmixr_legacy_dv_body <- function() {
+# A DataVersion in the *pre-0.2.2* shape: no `time_bases` map at all and no
+# recommended basis, with tables served without eligibility flags or a basis
+# echo. This is an honest negative case -- it is NOT "API 0.2.2 as deployed"
+# (deployed 0.2.2 advertises a boolean `time_bases` map + an object
+# recommendation; see nlmixr_022_dv_body() in test-nlmixr.R).
+nlmixr_pre022_dv_body <- function() {
   nlmixr_dv_body(recommended = NULL, time_bases = list())
 }
 
@@ -216,7 +219,7 @@ nlmixr_mock <- function(log = new.env(),
         error = list(code = "not_found", reason = "table_unavailable", message = "no table")
       )))
     }
-    # echo the requested basis like API 0.3; omit it like API 0.2 when none was sent
+    # echo the requested basis like API 0.3; omit it like a pre-0.2.2 server when none was sent
     basis <- if (grepl("time_basis=", req$url)) sub("^.*time_basis=([^&]+).*$", "\\1", req$url) else NULL
     # `echo = FALSE` models API 0.2.2 as deployed: the parameter is ignored, nothing echoed
     body$time_basis <- if (echo) basis else NULL
