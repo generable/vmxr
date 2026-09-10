@@ -22,13 +22,15 @@ vmx_data_versions(
 
 \item{eligible_for_modeling}{Optional modeling-eligibility filter (\code{TRUE} /
 \code{FALSE}). Against a 0.3 server it selects DataVersions eligible for
-modeling after QC on \code{time_basis}; against 0.2.2 it is the basis-agnostic
-flag.}
+modeling after QC \emph{on \code{time_basis}} — a basis-scoped question; against
+0.2.2 it is the basis-agnostic flag. The two servers therefore answer subtly
+different questions for the same argument (0.3 narrows to one basis), which is
+inherent to the contract change.}
 
-\item{time_basis}{Optional time basis (\code{"observed"}, \code{"nominal"}, or
-\code{"nominal_from_observed_dose"}). Required alongside \code{eligible_for_modeling}
-when the server serves the 0.3 contract; ignored by (and not sent to) a
-0.2.2 server.}
+\item{time_basis}{Optional time basis: one of \code{"observed"}, \code{"nominal"},
+\code{"nominal_from_observed_dose"}, or \code{"observed_from_predose_pk"}. Required
+alongside \code{eligible_for_modeling} when the server serves the 0.3 contract;
+ignored by (and not sent to) a 0.2.2 server.}
 
 \item{client}{A \code{vmx_client}.}
 }

@@ -17,12 +17,14 @@
 #' @param include_archived Include archived versions.
 #' @param eligible_for_modeling Optional modeling-eligibility filter (`TRUE` /
 #'   `FALSE`). Against a 0.3 server it selects DataVersions eligible for
-#'   modeling after QC on `time_basis`; against 0.2.2 it is the basis-agnostic
-#'   flag.
-#' @param time_basis Optional time basis (`"observed"`, `"nominal"`, or
-#'   `"nominal_from_observed_dose"`). Required alongside `eligible_for_modeling`
-#'   when the server serves the 0.3 contract; ignored by (and not sent to) a
-#'   0.2.2 server.
+#'   modeling after QC *on `time_basis`* — a basis-scoped question; against
+#'   0.2.2 it is the basis-agnostic flag. The two servers therefore answer
+#'   subtly different questions for the same argument (0.3 narrows to one
+#'   basis), which is inherent to the contract change.
+#' @param time_basis Optional time basis: one of `"observed"`, `"nominal"`,
+#'   `"nominal_from_observed_dose"`, or `"observed_from_predose_pk"`. Required
+#'   alongside `eligible_for_modeling` when the server serves the 0.3 contract;
+#'   ignored by (and not sent to) a 0.2.2 server.
 #' @param client A `vmx_client`.
 #' @return A tibble containing all matching data versions.
 #' @export
@@ -89,7 +91,7 @@ vmx_data_versions_eligibility_query <- function(eligible_for_modeling,
         "This VeloMetrix server serves the v0.3 API, which filters modeling ",
         "eligibility per time basis, so `eligible_for_modeling` requires a ",
         "`time_basis` (one of \"observed\", \"nominal\", ",
-        "\"nominal_from_observed_dose\")."
+        "\"nominal_from_observed_dose\", \"observed_from_predose_pk\")."
       ),
       class = "vmx_usage_error"
     )
@@ -114,7 +116,15 @@ vmx_data_versions_eligibility_query <- function(eligible_for_modeling,
 vmx_server_uses_basis_eligibility <- function(client) {
   health <- vmx_get(client, "/health")
   ver <- if (is.list(health)) health[["api_contract_version"]] else NULL
-  if (!is.character(ver) || length(ver) != 1L || is.na(ver) || !nzchar(ver)) {
+  # Coerce before parsing: the contract quotes the field ("0.3"), but a server
+  # that emits it as a JSON number would arrive as a double — treating that as
+  # "not a string -> legacy" would misclassify a 0.3 server and resurrect the
+  # silent-drop bug. A missing/empty/multi-valued field stays legacy.
+  if (is.null(ver) || length(ver) != 1L || is.na(ver)) {
+    return(FALSE)
+  }
+  ver <- as.character(ver)
+  if (!nzchar(ver)) {
     return(FALSE)
   }
   parsed <- tryCatch(numeric_version(ver), error = function(e) NULL)

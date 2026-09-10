@@ -11,8 +11,11 @@
   (the same after-QC admission flag `vmx_nlmixr_data()` defaults to) plus the
   new optional `time_basis` argument; against 0.2.2 it keeps sending
   `eligible_for_modeling` unchanged. A 0.3 server asked to filter without a
-  `time_basis` now errors (naming the accepted bases) rather than returning an
-  unfiltered list.
+  `time_basis` now errors (naming the four accepted bases) rather than returning
+  an unfiltered list. Note the mapped filters answer subtly different questions:
+  0.2.2's `eligible_for_modeling` is basis-agnostic, while 0.3's
+  `pk_eligible_for_modeling_after_qc` is scoped to the chosen `time_basis`, so
+  the same argument narrows to one basis against a 0.3 server.
 
 * Table fetching and `vmx_nlmixr_data()` work against both the API 0.3 shape
   and the API 0.2.2 shape deployed on the client workspaces (AGE-69). A server that
