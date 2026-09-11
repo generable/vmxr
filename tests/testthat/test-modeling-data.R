@@ -24,7 +24,7 @@ test_that("vmx_data_version_table coerces columns by declared type", {
   httr2::local_mocked_responses(function(req) {
     env$req <- req
     if (grepl("/data-versions/dv_1$", req$url)) {
-      # an API 0.2 DataVersion: no time_bases map -> the table is fetched without a basis
+      # a pre-0.2.2 DataVersion: no time_bases map -> the table is fetched without a basis
       return(httr2::response_json(body = list(data_version_id = "dv_1", status = "ready")))
     }
     httr2::response_json(body = pk_table())

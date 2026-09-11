@@ -1,0 +1,28 @@
+{
+  "data_version_id": "dv_1",
+  "domain": "pk",
+  "time_basis": "observed",
+  "columns": [
+    { "name": "gen_subject_uuid", "type": "string" },
+    { "name": "subject_id", "type": "string" },
+    { "name": "observed_time_hours", "type": "number" },
+    { "name": "biomarker_name", "type": "string" },
+    { "name": "biomarker_code", "type": "string" },
+    { "name": "value_float", "type": "number", "unit": "mg/L" },
+    { "name": "unit", "type": "string" },
+    { "name": "lloq", "type": "number" },
+    { "name": "uloq", "type": "number" },
+    { "name": "censoring", "type": "string" },
+    { "name": "eligible_for_modeling", "type": "boolean" }
+  ],
+  "rows": [
+    { "gen_subject_uuid": "u1", "subject_id": "S1", "observed_time_hours": 1, "biomarker_name": "drug", "biomarker_code": "drug_code", "value_float": 10, "unit": "mg/L", "lloq": null, "uloq": null, "censoring": null, "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u1", "subject_id": "S1", "observed_time_hours": 4, "biomarker_name": "drug", "biomarker_code": "drug_code", "value_float": 5, "unit": "mg/L", "lloq": null, "uloq": null, "censoring": null, "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u1", "subject_id": "S1", "observed_time_hours": 24, "biomarker_name": "drug", "biomarker_code": "drug_code", "value_float": null, "unit": "mg/L", "lloq": 0.1, "uloq": null, "censoring": "BLQ", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u1", "subject_id": "S1", "observed_time_hours": 48, "biomarker_name": "drug", "biomarker_code": "drug_code", "value_float": 3, "unit": "mg/L", "lloq": null, "uloq": null, "censoring": null, "eligible_for_modeling": false },
+    { "gen_subject_uuid": "u1", "subject_id": "S1", "observed_time_hours": 1, "biomarker_name": "metabolite", "biomarker_code": "metabolite_code", "value_float": 2, "unit": "mg/L", "lloq": null, "uloq": null, "censoring": null, "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u2", "subject_id": "S2", "observed_time_hours": 1, "biomarker_name": "drug", "biomarker_code": "drug_code", "value_float": 20, "unit": "mg/L", "lloq": null, "uloq": null, "censoring": null, "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u2", "subject_id": "S2", "observed_time_hours": 2, "biomarker_name": "drug", "biomarker_code": "drug_code", "value_float": null, "unit": "mg/L", "lloq": null, "uloq": 100, "censoring": "ALQ", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u3", "subject_id": "S3", "observed_time_hours": 1, "biomarker_name": "drug", "biomarker_code": "drug_code", "value_float": 0.5, "unit": "mg/L", "lloq": null, "uloq": null, "censoring": null, "eligible_for_modeling": false }
+  ]
+}

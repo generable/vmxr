@@ -1,0 +1,24 @@
+{
+  "data_version_id": "dv_1",
+  "domain": "covariates",
+  "time_basis": "observed",
+  "columns": [
+    { "name": "gen_subject_uuid", "type": "string" },
+    { "name": "name", "type": "string" },
+    { "name": "label", "type": "string" },
+    { "name": "type", "type": "string" },
+    { "name": "value_int", "type": "integer" },
+    { "name": "value_float", "type": "number" },
+    { "name": "value_str", "type": "string" },
+    { "name": "unit", "type": "string" },
+    { "name": "eligible_for_modeling", "type": "boolean" }
+  ],
+  "rows": [
+    { "gen_subject_uuid": "u1", "name": "weight", "label": "weight", "type": "positive_continuous", "value_int": null, "value_float": 70, "value_str": null, "unit": "kg", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u2", "name": "weight", "label": "weight", "type": "positive_continuous", "value_int": null, "value_float": 80, "value_str": null, "unit": "kg", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u3", "name": "weight", "label": "weight", "type": "positive_continuous", "value_int": null, "value_float": 60, "value_str": null, "unit": "kg", "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u1", "name": "sex", "label": "sex", "type": "categorical", "value_int": null, "value_float": null, "value_str": "M", "unit": null, "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u2", "name": "sex", "label": "sex", "type": "categorical", "value_int": null, "value_float": null, "value_str": "F", "unit": null, "eligible_for_modeling": true },
+    { "gen_subject_uuid": "u3", "name": "sex", "label": "sex", "type": "categorical", "value_int": null, "value_float": null, "value_str": "F", "unit": null, "eligible_for_modeling": true }
+  ]
+}

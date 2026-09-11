@@ -356,8 +356,8 @@ test_that("a pre-0.3 table without eligibility flags needs eligibility = 'all'",
     dosing = strip(nlmixr_dosing_body()), pd = strip(nlmixr_pd_body()),
     covariates = strip(nlmixr_covariates_body())
   )
-  # an API 0.2 server: no time_bases map, tables served without a basis echo
-  httr2::local_mocked_responses(nlmixr_mock(dv = nlmixr_legacy_dv_body(), tables = tables))
+  # a pre-0.2.2 server: no time_bases map, tables served without a basis echo
+  httr2::local_mocked_responses(nlmixr_mock(dv = nlmixr_pre022_dv_body(), tables = tables))
   expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", client = con), class = "vmx_usage_error")
   ev <- suppressWarnings(vmx_nlmixr_data("dv_1", analyte = "drug", eligibility = "all", client = con))
   expect_equal(sort(unique(ev$ID)), 1:3)
@@ -384,13 +384,13 @@ test_that("vmx_data_version_table resolves the basis from a bare id and echoes i
   expect_match(log2$requests[[1]], "/tables/pk\\?time_basis=observed$")
 })
 
-test_that("an API 0.2 DataVersion (no time_bases map) is fetched without the parameter", {
+test_that("a pre-0.2.2 DataVersion (no time_bases map) is fetched without the parameter", {
   log <- new.env()
-  httr2::local_mocked_responses(nlmixr_mock(log, dv = nlmixr_legacy_dv_body()))
+  httr2::local_mocked_responses(nlmixr_mock(log, dv = nlmixr_pre022_dv_body()))
   tbl <- vmx_pk("dv_1", client = con)
   expect_null(attr(tbl, "time_basis"))
   expect_false(grepl("time_basis", log$requests[[2]]))
-  # a bare-string recommendation (API 0.2 shape) still works
+  # a bare-string recommendation (pre-0.2.2 shape) still works
   log2 <- new.env()
   httr2::local_mocked_responses(nlmixr_mock(log2, dv = nlmixr_dv_body(recommended = "observed")))
   vmx_pk("dv_1", client = con)
@@ -538,4 +538,52 @@ test_that("the 0.2.x per-basis export (echoed basis, single eligible_for_modelin
   expect_equal(ev$ID, ref$ID)
   expect_equal(ev$TIME, ref$TIME)
   expect_equal(ev$AMT, ref$AMT)
+})
+
+test_that("a recorded API 0.2.2 per-basis export (test-022-dv fixtures) assembles from disk", {
+  # Recorded-shape coverage for the deployed 0.2.2 path, the sibling of the 0.3
+  # staging-dv replay above: read the on-disk test-022-dv payloads (not hand-built
+  # mocks) and confirm the client handles the faithful 0.2.2 shape.
+  fixture <- function(name) {
+    jsonlite::fromJSON(test_path("fixtures", "test-022-dv", paste0(name, ".json")), simplifyVector = FALSE)
+  }
+  dv_body <- fixture("dv")
+
+  # shape sanity: deployed 0.2.2 advertises a *boolean* time_bases map and an
+  # *object* recommended_time_basis (not the 0.3 per-basis descriptor objects).
+  expect_type(dv_body$time_bases$observed, "logical")
+  expect_true(dv_body$time_bases$observed)
+  expect_false(dv_body$time_bases$nominal)
+  expect_type(dv_body$recommended_time_basis, "list")
+  expect_equal(dv_body$recommended_time_basis$value, "observed")
+
+  log <- new.env()
+  log$requests <- character()
+  httr2::local_mocked_responses(function(req) {
+    log$requests <- c(log$requests, req$url)
+    path <- sub("\\?.*$", "", req$url)
+    if (grepl("/data-versions/[^/]+$", path)) return(httr2::response_json(body = dv_body))
+    domain <- sub("^.*/tables/", "", path)
+    httr2::response_json(body = fixture(domain))
+  })
+
+  # the basis is requested (the DV advertises it) and echoed by the payload:
+  # recorded, not refused.
+  tbl <- vmx_pk("dv_1", client = con)
+  expect_match(log$requests[[2]], "time_basis=observed$")
+  expect_equal(attr(tbl, "time_basis"), "observed")
+  expect_true(attr(tbl, "basis_echoed"))
+
+  # the single `eligible_for_modeling` flag is the admission filter; the canonical
+  # modeling dataset assembles without eligibility = "all".
+  ev <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)
+  expect_s3_class(ev, "tbl_df")
+  expect_identical(names(ev)[seq_along(nlmixr_core_cols)], nlmixr_core_cols)
+  expect_equal(attr(ev, "vmx")$time_basis, "observed")
+  expect_equal(attr(ev, "vmx")$eligibility_flag, "eligible_for_modeling")
+  # 5 eligible drug observations + 3 eligible doses; S3 (placebo) dropped entirely.
+  expect_equal(nrow(ev), 8L)
+  expect_equal(sum(ev$EVID == 0L), 5L)
+  expect_equal(sum(ev$EVID == 1L), 3L)
+  expect_equal(sort(unique(ev$ID)), c(1L, 2L))
 })
