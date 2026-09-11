@@ -19,6 +19,34 @@ capturing_mock <- function(bodies) {
   list(mock = mock, captured = captured)
 }
 
+# Like capturing_mock but records every request URL in order and always treats
+# `bodies` as a reply queue, so a multi-request flow (e.g. the /health shape
+# probe followed by the list request) can be asserted request-by-request.
+recording_mock <- function(bodies) {
+  i <- 0
+  rec <- new.env()
+  rec$urls <- character()
+  mock <- function(req) {
+    i <<- i + 1
+    rec$urls <- c(rec$urls, req$url)
+    rec$req <- req
+    httr2::response_json(body = bodies[[min(i, length(bodies))]])
+  }
+  list(mock = mock, rec = rec)
+}
+
+# A /health body; omit `api_contract_version` to model a pre-0.3 (0.2.2) server
+# that predates the field (additive-field rule, api-contract §5.13).
+health_body <- function(api_contract_version = NULL) {
+  b <- list(status = "ok", version = "v1")
+  if (!is.null(api_contract_version)) b$api_contract_version <- api_contract_version
+  b
+}
+
+dv_list_body <- function(...) {
+  list(items = list(...), next_cursor = NA_character_, has_next_page = FALSE)
+}
+
 study_item <- function(id, name, tmt = "tmt_1") {
   list(study_id = id, treatment_id = tmt, name = name, status = "active",
        counts = list(data_versions = 0L), last_activity_at = "2026-01-01T00:00:00Z",
@@ -139,19 +167,146 @@ test_that("vmx_study_update preserves an explicitly supplied JSON null", {
   )
 })
 
-test_that("vmx_data_versions forwards filters as query params", {
+test_that("vmx_data_versions forwards non-eligibility filters as query params", {
+  # No eligibility filter -> no /health probe, a single list request.
   cm <- capturing_mock(list(
     items = list(dv_item("dv_1")),
     next_cursor = NA_character_,
     has_next_page = FALSE
   ))
   httr2::local_mocked_responses(cm$mock)
-  tbl <- vmx_data_versions(study = "std_1", eligible_for_modeling = TRUE, client = con)
+  tbl <- vmx_data_versions(study = "std_1", client = con)
   expect_equal(nrow(tbl), 1L)
   url <- cm$captured$req$url
   expect_match(url, "study_id=std_1")
-  expect_match(url, "eligible_for_modeling=true")   # logical lower-cased
   expect_match(url, "include_archived=false")
+})
+
+test_that("vmx_data_versions sends the flat eligible_for_modeling filter to a 0.2.2 server", {
+  rm <- recording_mock(list(
+    health_body(),                 # no api_contract_version -> legacy 0.2.2 shape
+    dv_list_body(dv_item("dv_1"))
+  ))
+  httr2::local_mocked_responses(rm$mock)
+  tbl <- vmx_data_versions(study = "std_1", eligible_for_modeling = TRUE, client = con)
+  expect_equal(nrow(tbl), 1L)
+  expect_match(rm$rec$urls[[1]], "/health$")            # shape probe first
+  list_url <- rm$rec$urls[[2]]
+  expect_match(list_url, "eligible_for_modeling=true")  # logical lower-cased
+  expect_false(grepl("pk_eligible_for_modeling", list_url))
+  expect_false(grepl("time_basis", list_url))
+})
+
+test_that("vmx_data_versions maps eligibility to the basis-scoped filter on a 0.3 server", {
+  rm <- recording_mock(list(
+    health_body("0.3"),
+    dv_list_body(dv_item("dv_1"))
+  ))
+  httr2::local_mocked_responses(rm$mock)
+  tbl <- vmx_data_versions(
+    study = "std_1", eligible_for_modeling = TRUE,
+    time_basis = "observed", client = con
+  )
+  expect_equal(nrow(tbl), 1L)
+  list_url <- rm$rec$urls[[2]]
+  expect_match(list_url, "pk_eligible_for_modeling_after_qc=true")
+  expect_match(list_url, "time_basis=observed")
+  # the 0.2.2-only flat param must NOT be sent to a 0.3 server
+  expect_false(grepl("[?&]eligible_for_modeling=", list_url))
+})
+
+test_that("vmx_data_versions maps eligible_for_modeling = FALSE per server shape", {
+  rm03 <- recording_mock(list(
+    health_body("0.3"),
+    dv_list_body(dv_item("dv_1"))
+  ))
+  httr2::local_mocked_responses(rm03$mock)
+  vmx_data_versions(
+    eligible_for_modeling = FALSE, time_basis = "observed", client = con
+  )
+  expect_match(rm03$rec$urls[[2]], "pk_eligible_for_modeling_after_qc=false")
+  expect_match(rm03$rec$urls[[2]], "time_basis=observed")
+
+  rm22 <- recording_mock(list(
+    health_body(),
+    dv_list_body(dv_item("dv_1"))
+  ))
+  httr2::local_mocked_responses(rm22$mock)
+  vmx_data_versions(eligible_for_modeling = FALSE, client = con)
+  expect_match(rm22$rec$urls[[2]], "eligible_for_modeling=false")
+})
+
+test_that("vmx_data_versions re-sends the mapped eligibility filter on every page", {
+  # The 0.3-mapped params must persist across cursor pages, not just page 1 —
+  # dropping them mid-pagination would silently widen the result set.
+  rm <- recording_mock(list(
+    health_body("0.3"),
+    list(items = list(dv_item("dv_1")), next_cursor = "c1", has_next_page = TRUE),
+    dv_list_body(dv_item("dv_2"))
+  ))
+  httr2::local_mocked_responses(rm$mock)
+  tbl <- vmx_data_versions(
+    eligible_for_modeling = TRUE, time_basis = "observed", client = con
+  )
+  expect_equal(nrow(tbl), 2L)
+  page2 <- rm$rec$urls[[3]]
+  expect_match(page2, "cursor=c1")
+  expect_match(page2, "pk_eligible_for_modeling_after_qc=true")
+  expect_match(page2, "time_basis=observed")
+})
+
+test_that("vmx_data_versions refuses to send an eligibility filter a 0.3 server would drop", {
+  # eligible_for_modeling without time_basis on 0.3 must error, not return an
+  # unfiltered list. Only the /health probe should go out — no list request.
+  rm <- recording_mock(list(health_body("0.3")))
+  httr2::local_mocked_responses(rm$mock)
+  expect_error(
+    vmx_data_versions(study = "std_1", eligible_for_modeling = TRUE, client = con),
+    class = "vmx_usage_error"
+  )
+  expect_length(rm$rec$urls, 1L)
+  expect_match(rm$rec$urls[[1]], "/health$")
+})
+
+test_that("vmx_data_versions treats a >= 0.3 version as basis-scoped and an unparseable one as legacy", {
+  # A future contract version (>= 0.3) uses the basis-scoped filter, so filtering
+  # without time_basis errors — proving it was NOT misclassified as legacy.
+  rm_future <- recording_mock(list(health_body("1.0")))
+  httr2::local_mocked_responses(rm_future$mock)
+  expect_error(
+    vmx_data_versions(eligible_for_modeling = TRUE, client = con),
+    class = "vmx_usage_error"
+  )
+
+  # An unparseable version degrades to the legacy flat filter.
+  rm_bad <- recording_mock(list(
+    health_body("not-a-version"),
+    dv_list_body(dv_item("dv_1"))
+  ))
+  httr2::local_mocked_responses(rm_bad$mock)
+  vmx_data_versions(eligible_for_modeling = TRUE, client = con)
+  expect_match(rm_bad$rec$urls[[2]], "eligible_for_modeling=true")
+  expect_false(grepl("pk_eligible_for_modeling", rm_bad$rec$urls[[2]]))
+})
+
+test_that("vmx_data_versions rejects time_basis without eligible_for_modeling", {
+  rm <- recording_mock(list(dv_list_body(dv_item("dv_1"))))
+  httr2::local_mocked_responses(rm$mock)
+  expect_error(
+    vmx_data_versions(study = "std_1", time_basis = "observed", client = con),
+    class = "vmx_usage_error"
+  )
+  expect_length(rm$rec$urls, 0L)   # errors before any request, probe included
+})
+
+test_that("vmx_data_versions validates eligible_for_modeling is a single logical", {
+  rm <- recording_mock(list(health_body()))
+  httr2::local_mocked_responses(rm$mock)
+  expect_error(
+    vmx_data_versions(eligible_for_modeling = "yes", client = con),
+    class = "vmx_usage_error"
+  )
+  expect_length(rm$rec$urls, 0L)   # validation precedes the probe
 })
 
 test_that("vmx_data_versions accepts a vmx_study object", {
