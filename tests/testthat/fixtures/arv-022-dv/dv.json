@@ -1,0 +1,16 @@
+{
+  "data_version_id": "dv_1",
+  "status": "ready",
+  "n_subjects": 3,
+  "units": { "time": "h", "pk_concentration": "mg/L", "dose": "mg" },
+  "recommended_time_basis": { "value": "observed", "reason": "only eligible basis" },
+  "time_bases": { "observed": true, "nominal": false },
+  "table_availability": {
+    "subjects": true, "pk": true, "dosing": true, "pd": true,
+    "labs": false, "covariates": true, "qc_issues": true
+  },
+  "pd_markers": [
+    { "gen_uuid": "mk-effect", "name": "effect", "display_name": "effect", "type": "continuous", "unit": "%" },
+    { "gen_uuid": "mk-resp", "name": "resp", "display_name": "resp", "type": "binary", "unit": "1" }
+  ]
+}
