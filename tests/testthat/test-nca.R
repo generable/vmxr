@@ -140,6 +140,251 @@ test_that("vmx_nca_result reshapes point_estimates into a tidy tibble", {
   )
 })
 
+test_that("vmx_nca_result reads a single-interval 0.3 items[] response", {
+  env <- new.env()
+  httr2::local_mocked_responses(function(req) {
+    env$req <- req
+    httr2::response_json(body = list(
+      nca_id = "nca_1", data_version_id = "dv_1", status = "completed",
+      worker_version = "nca/0.8.0",
+      trigger_source = list(
+        type = "user", user_id = "usr_1",
+        system_component = NA_character_, reason = "user_request"
+      ),
+      retried_from = NA_character_, stale_data_version = FALSE,
+      current_data_version_id = "dv_1", rerun_warning = NA_character_,
+      inputs = list(time_basis = "observed", bloq_handling = "discard"),
+      items = list(list(
+        item_index = 1L, label = "First dosing interval",
+        gen_subject_uuid = list(
+          "11111111-1111-4111-8111-111111111111",
+          "22222222-2222-4222-8222-222222222222"
+        ),
+        subject_id = list("S1", "S2"),
+        resolved_dosing_interval_indices = list(1L, NA_integer_),
+        # second subject has no resolved interval -> JSON null (NA serialises to
+        # null); jsonlite would render a literal R NULL as `{}`, not `null`.
+        resolved_time_intervals_hours = list(
+          list(start_time_hours = 0, end_time_hours = 24),
+          NA
+        ),
+        point_estimates = list(
+          auc_interval = list(1180.1, NA),
+          cmax = list(10.5, 12.2)
+        ),
+        quantities = list(
+          list(name = "auc_interval", display_name = "AUC",
+               unit = "ng/mL*h", explanation = "Area under the curve."),
+          list(name = "cmax", display_name = "Cmax",
+               unit = "ng/mL", explanation = "Maximum concentration.")
+        ),
+        not_estimable_reasons = list(
+          list(),
+          list(auc_interval = list("insufficient_terminal_points"))
+        ),
+        excluded_subjects = list(),
+        units = list(auc_interval = "ng/mL*h", cmax = "ng/mL")
+      )),
+      next_cursor = NA_character_, has_next_page = FALSE
+    ))
+  })
+  tbl <- vmx_nca_result("nca_1", client = con)
+  expect_equal(nrow(tbl), 2L)
+  expect_equal(tbl$item_index, c(1L, 1L))
+  expect_equal(tbl$label, rep("First dosing interval", 2))
+  expect_equal(tbl$interval_start_hours, c(0, NA))
+  expect_equal(tbl$interval_end_hours, c(24, NA))
+  expect_equal(tbl$subject_id, c("S1", "S2"))
+  expect_equal(tbl$auc_interval, c(1180.1, NA))
+  expect_equal(tbl$cmax, c(10.5, 12.2))
+  # not_estimable_reasons is surfaced per subject; the null auc carries its reason
+  expect_equal(tbl$not_estimable_reasons[[1]], list())
+  expect_equal(
+    tbl$not_estimable_reasons[[2]]$auc_interval[[1]],
+    "insufficient_terminal_points"
+  )
+  expect_equal(attr(tbl, "time_basis"), "observed")
+  expect_equal(attr(tbl, "units")$cmax, "ng/mL")
+  expect_equal(attr(tbl, "worker_version"), "nca/0.8.0")
+  # not_estimable_reasons must be a list-column, not a metric column
+  expect_true("not_estimable_reasons" %in% names(tbl))
+})
+
+test_that("vmx_nca_result assembles a multi-interval, multi-page 0.3 result", {
+  env <- new.env()
+  i <- 0L
+  httr2::local_mocked_responses(function(req) {
+    env$req <- req
+    i <<- i + 1L
+    idx <- i
+    httr2::response_json(body = list(
+      nca_id = "nca_1", data_version_id = "dv_1", status = "completed",
+      worker_version = "nca/0.8.0",
+      trigger_source = list(
+        type = "system", user_id = NA_character_,
+        system_component = "event_router", reason = "data_version_eligible"
+      ),
+      retried_from = NA_character_, stale_data_version = FALSE,
+      current_data_version_id = "dv_1", rerun_warning = NA_character_,
+      inputs = list(time_basis = "observed", bloq_handling = "discard"),
+      items = list(list(
+        item_index = idx, label = paste("Interval", idx),
+        gen_subject_uuid = list(
+          "11111111-1111-4111-8111-111111111111",
+          "22222222-2222-4222-8222-222222222222"
+        ),
+        subject_id = list("S1", "S2"),
+        resolved_time_intervals_hours = list(
+          list(start_time_hours = (idx - 1) * 24, end_time_hours = idx * 24),
+          list(start_time_hours = (idx - 1) * 24, end_time_hours = idx * 24)
+        ),
+        point_estimates = list(cmax = list(10 * idx, 20 * idx)),
+        quantities = list(list(
+          name = "cmax", display_name = "Cmax",
+          unit = "ng/mL", explanation = "Maximum concentration."
+        )),
+        not_estimable_reasons = list(list(), list()),
+        excluded_subjects = list(),
+        units = list(cmax = "ng/mL")
+      )),
+      next_cursor = if (idx == 1L) "cursor-page-2" else NA_character_,
+      has_next_page = idx == 1L
+    ))
+  })
+  tbl <- vmx_nca_result("nca_1", client = con)
+  # both intervals across both pages assembled without truncation
+  expect_equal(nrow(tbl), 4L)
+  expect_equal(tbl$item_index, c(1L, 1L, 2L, 2L))
+  expect_equal(tbl$label, c("Interval 1", "Interval 1", "Interval 2", "Interval 2"))
+  expect_equal(tbl$interval_start_hours, c(0, 0, 24, 24))
+  expect_equal(tbl$interval_end_hours, c(24, 24, 48, 48))
+  expect_equal(tbl$cmax, c(10, 20, 20, 40))
+  # the second page was fetched with the server-provided opaque cursor
+  expect_match(env$req$url, "cursor=cursor-page-2")
+})
+
+nca_item_0_3 <- function(item_index, metrics, subject = "S1",
+                          uuid = "11111111-1111-4111-8111-111111111111",
+                          next_cursor = NA_character_, has_next_page = FALSE) {
+  quantities <- lapply(names(metrics), function(nm) list(
+    name = nm, display_name = toupper(nm), unit = "ng/mL",
+    explanation = "A PK quantity."
+  ))
+  units <- stats::setNames(as.list(rep("ng/mL", length(metrics))), names(metrics))
+  list(
+    nca_id = "nca_1", data_version_id = "dv_1", status = "completed",
+    inputs = list(time_basis = "observed", bloq_handling = "discard"),
+    items = list(list(
+      item_index = item_index, label = paste("Interval", item_index),
+      gen_subject_uuid = list(uuid), subject_id = list(subject),
+      point_estimates = lapply(metrics, function(v) list(v)),
+      quantities = quantities,
+      not_estimable_reasons = list(list()),
+      excluded_subjects = list(), units = units
+    )),
+    next_cursor = next_cursor, has_next_page = has_next_page
+  )
+}
+
+test_that("vmx_nca_result handles an empty 0.3 items[] collection", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      nca_id = "nca_1", data_version_id = "dv_1", status = "completed",
+      inputs = list(time_basis = "observed", bloq_handling = "discard"),
+      items = list(), next_cursor = NA_character_, has_next_page = FALSE
+    ))
+  ))
+  tbl <- vmx_nca_result("nca_1", client = con)
+  expect_equal(nrow(tbl), 0L)
+  expect_true(all(
+    c("item_index", "label", "subject_id", "gen_subject_uuid",
+      "not_estimable_reasons") %in% names(tbl)
+  ))
+})
+
+test_that("vmx_nca_result unions differing metric columns across items", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      nca_id = "nca_1", data_version_id = "dv_1", status = "completed",
+      inputs = list(time_basis = "observed", bloq_handling = "discard"),
+      items = list(
+        nca_item_0_3(1L, list(cmax = 5))$items[[1]],
+        nca_item_0_3(2L, list(auc = 9))$items[[1]]
+      ),
+      next_cursor = NA_character_, has_next_page = FALSE
+    ))
+  ))
+  tbl <- vmx_nca_result("nca_1", client = con)
+  expect_equal(nrow(tbl), 2L)
+  expect_true(all(c("cmax", "auc") %in% names(tbl)))
+  # each metric present only for its own item; the other row is NA
+  expect_equal(tbl$cmax, c(5, NA))
+  expect_equal(tbl$auc, c(NA, 9))
+  # per-item quantities are exposed as the de-duplicated union
+  expect_setequal(vapply(attr(tbl, "quantities"), `[[`, "", "name"), c("cmax", "auc"))
+})
+
+test_that("vmx_nca_result rejects a dropped page (non-contiguous item_index)", {
+  i <- 0L
+  httr2::local_mocked_responses(function(req) {
+    i <<- i + 1L
+    idx <- if (i == 1L) 1L else 3L  # page 2 skips index 2 -> gap
+    httr2::response_json(body = nca_item_0_3(
+      idx, list(cmax = idx),
+      next_cursor = if (i == 1L) "cursor-page-2" else NA_character_,
+      has_next_page = i == 1L
+    ))
+  })
+  expect_error(vmx_nca_result("nca_1", client = con), class = "vmx_response_error")
+})
+
+test_that("vmx_nca_result fails loudly on a repeated pagination cursor", {
+  httr2::local_mocked_responses(function(req) {
+    httr2::response_json(body = nca_item_0_3(
+      1L, list(cmax = 1), next_cursor = "loop", has_next_page = TRUE
+    ))
+  })
+  expect_error(vmx_nca_result("nca_1", client = con), class = "vmx_response_error")
+})
+
+test_that("vmx_nca_result surfaces not_estimable_reasons on the flat 0.2.2 shape", {
+  httr2::local_mocked_responses(list(
+    httr2::response_json(body = list(
+      nca_id = "nca_1", data_version_id = "dv_1", status = "completed",
+      time_basis = "observed",
+      subject_id = list("S1", "S2"),
+      gen_subject_uuid = list(
+        "11111111-1111-4111-8111-111111111111",
+        "22222222-2222-4222-8222-222222222222"
+      ),
+      point_estimates = list(cmax = list(10.5, NA)),
+      not_estimable_reasons = list(
+        list(),
+        list(cmax = list("insufficient_terminal_points"))
+      ),
+      quantities = list(list(
+        name = "cmax", display_name = "Cmax",
+        unit = "ng/mL", explanation = "Maximum concentration."
+      )),
+      excluded_subjects = list(), units = list(cmax = "ng/mL"),
+      trigger_source = list(
+        type = "system", system_component = "event_router",
+        reason = "data_version_eligible"
+      )
+    ))
+  ))
+  tbl <- vmx_nca_result("nca_1", client = con)
+  expect_equal(nrow(tbl), 2L)
+  expect_true("not_estimable_reasons" %in% names(tbl))
+  expect_equal(tbl$cmax, c(10.5, NA))
+  expect_equal(
+    tbl$not_estimable_reasons[[2]]$cmax[[1]],
+    "insufficient_terminal_points"
+  )
+  # the flat 0.2.2 shape has no per-interval dimension
+  expect_false("item_index" %in% names(tbl))
+})
+
 test_that("vmx_nca_result rejects misaligned point-estimate arrays", {
   httr2::local_mocked_responses(list(
     httr2::response_json(body = list(
