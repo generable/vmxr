@@ -12,7 +12,7 @@ modeling &rarr; simulation workflow in ergonomic, pipe-friendly verbs that
 Our users are pharmacometricians who work in R/RStudio; `vmxr` keeps the whole
 analysis next to their data instead of shuttling files and IDs through a shell.
 
-> **Status: functional (v0.2.0), pre-CRAN.** The client covers the full analysis
+> **Status: functional (v0.3.0), pre-CRAN.** The client covers the full analysis
 > workflow end to end — treatments, studies, datasets and prep, data versions,
 > modeling-data tables, NCA, modeling (build runs, fits, estimates), simulation,
 > and the study analysis log. Contract-shaped responses are covered by the
@@ -23,7 +23,7 @@ analysis next to their data instead of shuttling files and IDs through a shell.
 > a clear "not implemented" error. See [`docs/r-client-design.md`](docs/r-client-design.md)
 > for the full design and the RStudio/coder deployment plan.
 
-Targets **API `0.2.x` / CLI `0.6.x`**.
+Targets **API `0.2.x` and `0.3` / CLI `0.6.x`**.
 
 ## What you can do
 
