@@ -2,7 +2,7 @@
 % Please edit documentation in R/nca.R
 \name{vmx_nca_result}
 \alias{vmx_nca_result}
-\title{NCA result table (PK parameters, one row per subject)}
+\title{NCA result table (PK parameters, per subject and result interval)}
 \usage{
 vmx_nca_result(nca, client = vmx_client())
 }
@@ -15,8 +15,28 @@ vmx_nca_result(nca, client = vmx_client())
 A tibble.
 }
 \description{
-Reshapes the \code{point_estimates} payload (metric -> per-subject values, parallel
-to the subject arrays) into a tidy tibble: \code{subject_id}, \code{gen_subject_uuid},
-and one column per PK quantity. The quantity metadata (display names, units,
-explanations) is attached as the \code{"quantities"} attribute.
+Reads the NCA result and returns a tidy tibble of point estimates, handling
+both server shapes transparently:
+}
+\details{
+\itemize{
+\item \strong{API 0.3} returns a cursor-paged collection whose \code{items[]} are
+\code{NcaResultItem}s — one per result interval of interest. Every page is
+followed to the end via \code{next_cursor} and the items are assembled without
+truncation. Each row is one subject within one interval, and the per-interval
+dimension is carried in the \code{item_index}, \code{label}, \code{interval_start_hours},
+and \code{interval_end_hours} columns (the two \verb{*_hours} columns are \code{NA} when the
+server did not resolve a time interval for that subject).
+\item \strong{API 0.2.2} returns a single flat object with top-level per-subject
+parallel arrays and one \code{point_estimates} map. Each row is one subject (there
+is no per-interval dimension, so the interval columns are absent).
+}
+
+In both shapes the \code{point_estimates} map (metric -> per-subject values,
+parallel to \code{gen_subject_uuid}) becomes one column per PK quantity, and
+\code{not_estimable_reasons} — the per-subject map of metric -> reason strings — is
+surfaced as the \code{not_estimable_reasons} list-column, so a null point estimate
+carries its reason. Quantity metadata (display names, units, explanations) is
+attached as the \code{"quantities"} attribute and the compact unit lookup as
+\code{"units"}; for 0.3 these are the de-duplicated union across items.
 }
