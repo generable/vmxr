@@ -9,7 +9,8 @@ vmx_data_versions(
   study = NULL,
   include_archived = FALSE,
   eligible_for_modeling = NULL,
-  client = vmx_client()
+  client = vmx_client(),
+  time_basis = NULL
 )
 }
 \arguments{
@@ -19,7 +20,17 @@ vmx_data_versions(
 
 \item{include_archived}{Include archived versions.}
 
-\item{eligible_for_modeling}{Optional modeling-eligibility filter.}
+\item{eligible_for_modeling}{Optional modeling-eligibility filter (\code{TRUE} /
+\code{FALSE}). Against a 0.3 server it selects DataVersions eligible for
+modeling after QC \emph{on \code{time_basis}} — a basis-scoped question; against
+0.2.2 it is the basis-agnostic flag. The two servers therefore answer subtly
+different questions for the same argument (0.3 narrows to one basis), which is
+inherent to the contract change.}
+
+\item{time_basis}{Optional time basis: one of \code{"observed"}, \code{"nominal"},
+\code{"nominal_from_observed_dose"}, or \code{"observed_from_predose_pk"}. Required
+alongside \code{eligible_for_modeling} when the server serves the 0.3 contract;
+ignored by (and not sent to) a 0.2.2 server.}
 
 \item{client}{A \code{vmx_client}.}
 }
@@ -27,5 +38,14 @@ vmx_data_versions(
 A tibble containing all matching data versions.
 }
 \description{
-List data versions
+The modeling-eligibility filter maps onto whichever query param the served
+API contract accepts. The 0.2.2 API filters on a single basis-agnostic
+\code{eligible_for_modeling} boolean; the 0.3 API replaced it with the
+basis-scoped \code{pk_eligible_for_modeling_after_qc} filter, which requires a
+companion \code{time_basis} (api-contract §5.4). Because a 0.3 server
+\emph{silently drops} the unknown 0.2.2 param and returns the full unfiltered
+list, the served shape is detected first — from \code{/health}'s
+\code{api_contract_version} (§5.13) — and the filter is mapped accordingly; a
+0.3 server asked to filter without a \code{time_basis} errors rather than
+returning an unfiltered list.
 }
