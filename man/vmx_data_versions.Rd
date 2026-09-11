@@ -9,8 +9,8 @@ vmx_data_versions(
   study = NULL,
   include_archived = FALSE,
   eligible_for_modeling = NULL,
-  time_basis = NULL,
-  client = vmx_client()
+  client = vmx_client(),
+  time_basis = NULL
 )
 }
 \arguments{

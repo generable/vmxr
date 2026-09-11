@@ -31,8 +31,8 @@
 vmx_data_versions <- function(treatment = NULL, study = NULL,
                               include_archived = FALSE,
                               eligible_for_modeling = NULL,
-                              time_basis = NULL,
-                              client = vmx_client()) {
+                              client = vmx_client(),
+                              time_basis = NULL) {
   params <- list(
     treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
     study_id = vmx_opt_id(study, "std", "study"),
