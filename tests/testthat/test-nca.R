@@ -210,6 +210,84 @@ test_that("vmx_nca_result reads a single-interval 0.3 items[] response", {
   expect_true("not_estimable_reasons" %in% names(tbl))
 })
 
+test_that("vmx_nca_result reads a recorded 0.3 result byte-for-byte", {
+  # Recorded from arv-staging (API 0.3, worker nca/0.13.4) on 2026-09-14; see
+  # fixtures/nca-result-03/README.md. Served as raw bytes so jsonlite's
+  # re-serialisation cannot change nulls or empty objects on the way in.
+  body <- readBin(
+    test_path("fixtures", "nca-result-03", "result.json"), "raw",
+    file.size(test_path("fixtures", "nca-result-03", "result.json"))
+  )
+  env <- new.env()
+  httr2::local_mocked_responses(function(req) {
+    env$req <- req
+    httr2::response(
+      status_code = 200L,
+      headers = list("Content-Type" = "application/json"),
+      body = body
+    )
+  })
+  tbl <- vmx_nca_result("nca_fixture0300000000000000000000", client = con)
+  expect_match(env$req$url, "/nca-analyses/nca_fixture0300000000000000000000/result$")
+
+  # one row per subject for the single item; identity + interval columns first
+  expect_equal(nrow(tbl), 32L)
+  expect_equal(
+    names(tbl)[1:6],
+    c("item_index", "label", "interval_start_hours", "interval_end_hours",
+      "subject_id", "gen_subject_uuid")
+  )
+  expect_equal(tbl$item_index, rep(1L, 32))
+  expect_equal(tbl$label, rep("First dosing interval", 32))
+  expect_type(tbl$subject_id, "character")
+  expect_equal(anyDuplicated(tbl$gen_subject_uuid), 0L)
+  expect_equal(anyDuplicated(tbl$subject_id), 0L)
+
+  # a single-dose study: the server resolves no interval for any subject
+  expect_true(all(is.na(tbl$interval_start_hours)))
+  expect_true(all(is.na(tbl$interval_end_hours)))
+
+  # all 19 served quantities become numeric columns, in the served order
+  metrics <- vapply(attr(tbl, "quantities"), `[[`, "", "name")
+  expect_length(metrics, 19L)
+  expect_true(all(metrics %in% names(tbl)))
+  expect_setequal(names(attr(tbl, "units")), metrics)
+  expect_equal(attr(tbl, "units")$cmax, "mg/L")
+  expect_equal(attr(tbl, "units")$auc_inf, "mg/L*h")
+
+  # populated quantities are complete; tau-dependent ones are all-NA with a
+  # per-subject reason carried in the list-column
+  for (m in c("cmax", "tmax", "auc_inf", "auc_last", "t_half", "cl", "v",
+              "n_observations", "terminal_rate_constant")) {
+    expect_false(anyNA(tbl[[m]]), info = m)
+    expect_type(tbl[[m]], "double")
+  }
+  for (m in c("c_avg", "auc_tau", "auc_interval", "auc_interval_duration",
+              "auc_tau_interval_duration")) {
+    expect_true(all(is.na(tbl[[m]])), info = m)
+  }
+  expect_length(tbl$not_estimable_reasons, 32L)
+  expect_equal(
+    tbl$not_estimable_reasons[[1]]$auc_tau[[1]],
+    "intended_tau_not_available_for_subject"
+  )
+  expect_equal(
+    tbl$not_estimable_reasons[[1]]$auc_interval[[1]],
+    "open_ended_dosing_interval"
+  )
+  expect_equal(tbl$subject_id[[1]], "9")
+  expect_equal(tbl$cmax[[1]], 12.9)
+
+  # envelope metadata rides along as attributes
+  expect_equal(attr(tbl, "nca_id"), "nca_fixture0300000000000000000000")
+  expect_equal(attr(tbl, "data_version_id"), "dv_fixture0300000000000000000000000")
+  expect_equal(attr(tbl, "status"), "completed")
+  expect_equal(attr(tbl, "time_basis"), "observed")
+  expect_equal(attr(tbl, "worker_version"), "nca/0.13.4")
+  expect_equal(attr(tbl, "trigger_source")$system_component, "event_router")
+  expect_equal(length(attr(tbl, "excluded_subjects")), 0L)
+})
+
 test_that("vmx_nca_result assembles a multi-interval, multi-page 0.3 result", {
   env <- new.env()
   i <- 0L
