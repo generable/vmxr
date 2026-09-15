@@ -587,3 +587,164 @@ test_that("a recorded API 0.2.2 per-basis export (arv-022-dv fixtures) assembles
   expect_equal(sum(ev$EVID == 1L), 3L)
   expect_equal(sort(unique(ev$ID)), c(1L, 2L))
 })
+
+# --- AGE-108: replicate index for same-time repeated observations -------------
+# The R surface is testable before the gecodata sibling ships, on hand-built
+# tables: one subject, one oral dose, and repeated same-time pk/pd observations
+# whose emission order is fixed by `gen_measurement_uuid`, not source-row order
+# (the two same-time rows are supplied source-first in the *reverse* of uuid
+# order, so a stable-sort-only implementation would rank them the other way).
+
+repl_dv <- function(pd = FALSE) {
+  nlmixr_dv_body(table_availability = list(
+    subjects = TRUE, pk = TRUE, dosing = TRUE, pd = pd,
+    labs = FALSE, covariates = FALSE, qc_issues = FALSE
+  ))
+}
+
+repl_subjects <- function() {
+  list(
+    data_version_id = "dv_1", domain = "subjects", time_basis = "observed",
+    columns = c(list(
+      nlmixr_col("gen_subject_uuid", "string"), nlmixr_col("subject_id", "string")
+    ), nlmixr_flag_cols()),
+    rows = list(c(list(gen_subject_uuid = "u1", subject_id = "S1"), nlmixr_flags()))
+  )
+}
+
+repl_dosing <- function() {
+  list(
+    data_version_id = "dv_1", domain = "dosing", time_basis = "observed",
+    columns = c(list(
+      nlmixr_col("gen_subject_uuid", "string"), nlmixr_col("subject_id", "string"),
+      nlmixr_col("observed_time_hours", "number"), nlmixr_col("time_hours", "number"),
+      nlmixr_col("dose_mass", "number", "mg"), nlmixr_col("route", "string")
+    ), nlmixr_flag_cols()),
+    rows = list(c(list(
+      gen_subject_uuid = "u1", subject_id = "S1", observed_time_hours = 0,
+      time_hours = 0, dose_mass = 100, route = "po"
+    ), nlmixr_flags()))
+  )
+}
+
+repl_pk <- function() {
+  row <- function(t, value, muid) c(list(
+    gen_measurement_uuid = muid, gen_subject_uuid = "u1", subject_id = "S1",
+    observed_time_hours = t, time_hours = t, biomarker_name = "drug",
+    biomarker_code = "drug_code", value_float = value, unit = "mg/L"
+  ), nlmixr_flags())
+  list(
+    data_version_id = "dv_1", domain = "pk", time_basis = "observed",
+    columns = c(list(
+      nlmixr_col("gen_measurement_uuid", "string"),
+      nlmixr_col("gen_subject_uuid", "string"), nlmixr_col("subject_id", "string"),
+      nlmixr_col("observed_time_hours", "number"), nlmixr_col("time_hours", "number"),
+      nlmixr_col("biomarker_name", "string"), nlmixr_col("biomarker_code", "string"),
+      nlmixr_col("value_float", "number", "mg/L"), nlmixr_col("unit", "string")
+    ), nlmixr_flag_cols()),
+    rows = list(
+      row(1, 10, "m-b"),   # supplied first, but uuid "m-b" -> replicate 2
+      row(1, 12, "m-a"),   # uuid "m-a" -> replicate 1
+      row(4, 5,  "m-c")    # no same-time partner -> replicate 1
+    )
+  )
+}
+
+repl_pd <- function() {
+  row <- function(t, value, muid) c(list(
+    gen_measurement_uuid = muid, gen_subject_uuid = "u1", subject_id = "S1",
+    observed_time_hours = t, time_hours = t, biomarker_name = "effect",
+    value_float = value, value_int = NULL, unit = "%"
+  ), nlmixr_flags())
+  list(
+    data_version_id = "dv_1", domain = "pd", time_basis = "observed",
+    columns = c(list(
+      nlmixr_col("gen_measurement_uuid", "string"),
+      nlmixr_col("gen_subject_uuid", "string"), nlmixr_col("subject_id", "string"),
+      nlmixr_col("observed_time_hours", "number"), nlmixr_col("time_hours", "number"),
+      nlmixr_col("biomarker_name", "string"), nlmixr_col("value_float", "number"),
+      nlmixr_col("value_int", "integer"), nlmixr_col("unit", "string")
+    ), nlmixr_flag_cols()),
+    rows = list(
+      row(2, 50, "m-e2"),  # supplied first, uuid "m-e2" -> replicate 2
+      row(2, 40, "m-e1")   # uuid "m-e1" -> replicate 1
+    )
+  )
+}
+
+test_that("two same-time pk rows get replicate ranks 1 and 2 in uuid order", {
+  httr2::local_mocked_responses(nlmixr_mock(dv = repl_dv(), tables = list(
+    subjects = repl_subjects(), pk = repl_pk(), dosing = repl_dosing()
+  )))
+  ev <- vmx_nlmixr_data("dv_1", analyte = "drug", replicate = TRUE, client = con)
+  expect_true("REPLICATE" %in% names(ev))
+
+  pair <- ev[ev$EVID == 0L & ev$TIME == 1, ]
+  expect_equal(nrow(pair), 2L)
+  # ranked by gen_measurement_uuid (m-a < m-b), NOT by source order
+  expect_equal(pair$REPLICATE, c(1L, 2L))
+  expect_equal(pair$DV, c(12, 10))            # m-a (12) emitted before m-b (10)
+
+  lone <- ev[ev$EVID == 0L & ev$TIME == 4, ]
+  expect_equal(lone$REPLICATE, 1L)            # no same-time partner
+  # dose rows never take a replicate index
+  expect_true(all(is.na(ev$REPLICATE[ev$EVID == 1L])))
+
+  ends <- attr(ev, "vmx")$endpoints
+  expect_true("has_repeated_times" %in% names(ends))
+  expect_true(ends$has_repeated_times[ends$dvid == 1L])
+})
+
+test_that("same-time ordering is deterministic even without the replicate column", {
+  mock <- nlmixr_mock(dv = repl_dv(), tables = list(
+    subjects = repl_subjects(), pk = repl_pk(), dosing = repl_dosing()
+  ))
+  httr2::local_mocked_responses(mock)
+  a <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)  # replicate off (default)
+  expect_false("REPLICATE" %in% names(a))
+  pair <- a[a$EVID == 0L & a$TIME == 1, ]
+  expect_equal(pair$DV, c(12, 10))            # still uuid order, column or not
+  # endpoint metadata reports the repeat regardless of the argument
+  expect_true(attr(a, "vmx")$endpoints$has_repeated_times[1])
+})
+
+test_that("a same-time pd pair ranks 1 and 2 in uuid order on its own endpoint", {
+  httr2::local_mocked_responses(nlmixr_mock(dv = repl_dv(pd = TRUE), tables = list(
+    subjects = repl_subjects(), pk = repl_pk(), dosing = repl_dosing(), pd = repl_pd()
+  )))
+  ev <- vmx_nlmixr_data("dv_1", analyte = "drug", pd_markers = "effect",
+                        replicate = TRUE, client = con)
+  ends <- attr(ev, "vmx")$endpoints
+  effect_dvid <- ends$dvid[ends$name == "effect"]
+  pd_pair <- ev[ev$EVID == 0L & ev$DVID == effect_dvid & ev$TIME == 2, ]
+  expect_equal(nrow(pd_pair), 2L)
+  expect_equal(pd_pair$REPLICATE, c(1L, 2L))
+  expect_equal(pd_pair$DV, c(40, 50))         # m-e1 (40) before m-e2 (50)
+  # both endpoints carry a same-time pair here
+  expect_true(all(ends$has_repeated_times))
+})
+
+test_that("the default call is unchanged for a dataset without repeats", {
+  httr2::local_mocked_responses(nlmixr_mock())
+  base <- vmx_nlmixr_data("dv_1", analyte = "drug", client = con)
+  expect_false("REPLICATE" %in% names(base))
+  ends <- attr(base, "vmx")$endpoints
+  expect_true("has_repeated_times" %in% names(ends))
+  expect_false(any(ends$has_repeated_times))  # no endpoint has a same-time pair
+
+  # requesting the index on a no-repeat dataset ranks every observation 1
+  withrep <- vmx_nlmixr_data("dv_1", analyte = "drug", replicate = TRUE, client = con)
+  expect_true(all(withrep$REPLICATE[withrep$EVID == 0L] == 1L))
+  expect_true(all(is.na(withrep$REPLICATE[withrep$EVID == 1L])))
+  # same rows, same order as the default call — REPLICATE is purely additive
+  expect_equal(withrep$DV[withrep$EVID == 0L], base$DV[base$EVID == 0L])
+  expect_equal(nrow(withrep), nrow(base))
+})
+
+test_that("replicate must be a single TRUE/FALSE", {
+  httr2::local_mocked_responses(nlmixr_mock())
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", replicate = "yes", client = con),
+               class = "vmx_usage_error")
+  expect_error(vmx_nlmixr_data("dv_1", analyte = "drug", replicate = NA, client = con),
+               class = "vmx_usage_error")
+})

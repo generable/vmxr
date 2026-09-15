@@ -42,6 +42,15 @@ vmx_nlmixr_default_cmt <- function() {
 #' pre-dose sample that shares its time with an IV bolus into the observation
 #' compartment must carry its own earlier time in the source data.
 #'
+#' Observations that share a subject, endpoint and time are always emitted in a
+#' deterministic order — by the measurement uuid (`gen_measurement_uuid`, the
+#' row identity on the pk/pd tables) and then source-row order — whether or not
+#' the replicate index is requested. With `replicate = TRUE` the layout also
+#' carries a `REPLICATE` column: the 1-based rank of each observation within its
+#' `(ID, DVID, TIME)` group in that order, `NA` on dose rows and `1` for an
+#' observation with no same-time partner. The index is derived here in R and is
+#' deliberately not part of the DataVersion.
+#'
 #' Columns: `ID` (dense integer per subject with admitted rows), `TIME` (hours on the selected
 #' time basis), `DV`, `AMT` (mg), `EVID` (0 observation / 1 dose), `MDV`, `CMT`,
 #' `RATE` (mg/h, > 0 for infusions), `II`, `ADDL`, `SS` (always 0 — the
@@ -77,20 +86,31 @@ vmx_nlmixr_default_cmt <- function() {
 #' @param cmt Named integer vector mapping dosing routes and `"observation"` to
 #'   compartments; see [vmx_nlmixr_default_cmt()]. PD markers get compartments
 #'   after the highest mapped value, in the order they are included.
+#' @param replicate If `TRUE`, add a `REPLICATE` column: the 1-based rank of each
+#'   observation within its subject, endpoint and time (`(ID, DVID, TIME)`),
+#'   ordered by `gen_measurement_uuid` then source-row order; `NA` on dose rows
+#'   and `1` for an observation with no same-time partner. Off by default. The
+#'   index is derived in R, not read from the DataVersion.
 #' @param client A `vmx_client`.
 #' @return A tibble in NONMEM layout. The `"vmx"` attribute is a list with
 #'   `data_version_id`, `time_basis`, `units`, `analyte`, `eligibility`,
 #'   `analysis_ready`, `cmt`, `endpoints` (a tibble of `dvid`, `name`, `cmt`,
-#'   `unit`), `dropped` (named integer counts), and `n_subjects`.
+#'   `unit`, and `has_repeated_times` — whether the endpoint carries any
+#'   observation that shares its time), `dropped` (named integer counts), and
+#'   `n_subjects`. With `replicate = TRUE` the layout gains a `REPLICATE` column
+#'   (see the argument).
 #' @seealso [vmx_model_data()] for the underlying tidy tables.
 #' @export
 vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
                             eligibility = c("after_qc", "before_qc", "all"),
-                            pd_markers = NULL, cmt = NULL,
+                            pd_markers = NULL, cmt = NULL, replicate = FALSE,
                             client = vmx_client()) {
   eligibility <- match.arg(eligibility)
   strict <- identical(eligibility, "after_qc")
   cmt <- vmx_nlmixr_cmt_map(cmt)
+  if (!is.logical(replicate) || length(replicate) != 1L || is.na(replicate)) {
+    vmx_abort("`replicate` must be a single `TRUE` or `FALSE`.", class = "vmx_usage_error")
+  }
   if (!is.null(analyte)) {
     analyte <- vmx_nonempty_strings(analyte, "analyte", exactly_one = TRUE)
   }
@@ -193,6 +213,9 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
 
   # ---- assemble -----------------------------------------------------------
   events <- do.call(rbind, c(list(pk_obs$rows, doses$rows), pd_parts))
+  # Stable source-row order: the tiebreak of last resort, so same-time rows are
+  # emitted deterministically even for a table without `gen_measurement_uuid`.
+  events[[".srcord"]] <- seq_len(nrow(events))
   if (nrow(events) == 0L || !any(events$EVID == 0L) || !any(events$EVID == 1L)) {
     pk_flag <- vmx_nlmixr_basis_pk_flag(md$meta, basis, eligibility)
     vmx_abort(
@@ -219,7 +242,31 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
   # Ties on TIME are ordered dose-first, matching how rxode2/nlmixr2 resolve
   # them; a pre-dose sample coincident with an IV bolus into the observation
   # compartment therefore needs its own (earlier) time in the source data.
-  events <- events[order(events$ID, events$TIME, -events$EVID, events$CMT, events$DVID), , drop = FALSE]
+  # Same-time observations within one subject and endpoint are then ordered by
+  # the measurement uuid (`gen_measurement_uuid`, the row identity on pk/pd per
+  # dataversion-schema §10) and finally source-row order, so repeated samples at
+  # one time are emitted in a stable, reproducible order.
+  events <- events[order(events$ID, events$TIME, -events$EVID, events$CMT,
+                         events$DVID, events[[".gmu"]], events[[".srcord"]]), , drop = FALSE]
+
+  # Replicate index: the 1-based rank of each observation within its subject
+  # (`ID`), endpoint (`DVID`) and `TIME`, in the deterministic order above; `NA`
+  # on dose rows and `1` for an observation with no same-time partner. It is
+  # derived here in R and is deliberately NOT a DataVersion column. The endpoint
+  # metadata records, per endpoint, whether any observation shares its time.
+  is_obs <- events$EVID == 0L
+  rep_idx <- rep(NA_integer_, nrow(events))
+  if (any(is_obs)) {
+    grp <- paste(events$ID[is_obs], events$DVID[is_obs], events$TIME[is_obs], sep = "\r")
+    rep_idx[is_obs] <- as.integer(stats::ave(which(is_obs), grp, FUN = seq_along))
+    repeated <- tapply(rep_idx[is_obs], events$DVID[is_obs], function(r) any(r > 1L))
+    endpoints$has_repeated_times <- vapply(
+      endpoints$dvid, function(d) isTRUE(unname(repeated[as.character(d)])), logical(1)
+    )
+  } else {
+    endpoints$has_repeated_times <- rep(FALSE, nrow(endpoints))
+  }
+  if (isTRUE(replicate)) events$REPLICATE <- rep_idx
 
   covariates <- vmx_nlmixr_covariates(md$covariates, eligibility)
   if (!is.null(covariates)) {
@@ -246,13 +293,19 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
 
   core <- c("ID", "TIME", "DV", "AMT", "EVID", "MDV", "CMT", "RATE", "II", "ADDL",
             "SS", "CENS", "LIMIT", "DVID", "subject_id")
+  if (isTRUE(replicate)) {
+    # REPLICATE sits with the event columns, right after DVID.
+    core <- append(core, "REPLICATE", after = match("DVID", core))
+  }
   if (nrow(endpoints) == 1L) {
     # Single endpoint: rxode2 treats a DVID column as an endpoint index and warns
     # when it is not 1..n, so only emit it for multi-endpoint (PD) datasets.
     events$DVID <- NULL
     core <- setdiff(core, "DVID")
   }
-  out <- tibble::as_tibble(events[, c(core, setdiff(names(events), c(core, "gen_subject_uuid"))), drop = FALSE])
+  # `.gmu` / `.srcord` are internal ordering keys, never part of the layout.
+  hidden <- c("gen_subject_uuid", ".gmu", ".srcord")
+  out <- tibble::as_tibble(events[, c(core, setdiff(names(events), c(core, hidden))), drop = FALSE])
   attr(out, "vmx") <- list(
     data_version_id = md$meta$data_version_id,
     time_basis = basis,
@@ -581,7 +634,10 @@ vmx_nlmixr_observations <- function(tbl, basis, dvid, cmt, domain, strict) {
     SS = 0L,
     CENS = cens,
     LIMIT = limit,
-    DVID = as.integer(dvid)
+    DVID = as.integer(dvid),
+    # Row identity, carried only to order same-time observations deterministically
+    # (dropped before the layout is returned); NA when the table does not serve it.
+    .gmu = as.character(vmx_nlmixr_optional(tbl, "gen_measurement_uuid"))
   )
   list(rows = rows[ok, , drop = FALSE], n_dropped = sum(!ok))
 }
@@ -649,7 +705,9 @@ vmx_nlmixr_doses <- function(dosing, basis, cmt, strict) {
     LIMIT = NA_real_,
     # rxode2 renumbers DVID to 1..n over every row, so dose rows take the PK
     # endpoint's id rather than a sentinel that would shift the numbering.
-    DVID = 1L
+    DVID = 1L,
+    # Dose rows carry no measurement identity; they never take a replicate index.
+    .gmu = NA_character_
   )
   list(rows = rows[ok, , drop = FALSE], n_dropped = sum(!ok))
 }
