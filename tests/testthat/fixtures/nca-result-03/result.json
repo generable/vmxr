@@ -1,0 +1,1497 @@
+{
+ "stale_data_version": false,
+ "current_data_version_id": "dv_fixture0300000000000000000000000",
+ "rerun_warning": null,
+ "nca_id": "nca_fixture0300000000000000000000",
+ "data_version_id": "dv_fixture0300000000000000000000000",
+ "status": "completed",
+ "label": null,
+ "worker_version": "nca/0.13.4",
+ "trigger_source": {
+  "type": "system",
+  "user_id": null,
+  "system_component": "event_router",
+  "reason": "data_version_eligible"
+ },
+ "retried_from": null,
+ "inputs": {
+  "time_basis": "observed",
+  "bloq_handling": "discard"
+ },
+ "items": [
+  {
+   "item_index": 1,
+   "label": "First dosing interval",
+   "gen_subject_uuid": [
+    "00000001-0000-4000-8000-000000000001",
+    "00000002-0000-4000-8000-000000000002",
+    "00000003-0000-4000-8000-000000000003",
+    "00000004-0000-4000-8000-000000000004",
+    "00000005-0000-4000-8000-000000000005",
+    "00000006-0000-4000-8000-000000000006",
+    "00000007-0000-4000-8000-000000000007",
+    "00000008-0000-4000-8000-000000000008",
+    "00000009-0000-4000-8000-000000000009",
+    "00000010-0000-4000-8000-000000000010",
+    "00000011-0000-4000-8000-000000000011",
+    "00000012-0000-4000-8000-000000000012",
+    "00000013-0000-4000-8000-000000000013",
+    "00000014-0000-4000-8000-000000000014",
+    "00000015-0000-4000-8000-000000000015",
+    "00000016-0000-4000-8000-000000000016",
+    "00000017-0000-4000-8000-000000000017",
+    "00000018-0000-4000-8000-000000000018",
+    "00000019-0000-4000-8000-000000000019",
+    "00000020-0000-4000-8000-000000000020",
+    "00000021-0000-4000-8000-000000000021",
+    "00000022-0000-4000-8000-000000000022",
+    "00000023-0000-4000-8000-000000000023",
+    "00000024-0000-4000-8000-000000000024",
+    "00000025-0000-4000-8000-000000000025",
+    "00000026-0000-4000-8000-000000000026",
+    "00000027-0000-4000-8000-000000000027",
+    "00000028-0000-4000-8000-000000000028",
+    "00000029-0000-4000-8000-000000000029",
+    "00000030-0000-4000-8000-000000000030",
+    "00000031-0000-4000-8000-000000000031",
+    "00000032-0000-4000-8000-000000000032"
+   ],
+   "subject_id": [
+    "9",
+    "32",
+    "19",
+    "7",
+    "22",
+    "15",
+    "31",
+    "30",
+    "14",
+    "18",
+    "8",
+    "1",
+    "33",
+    "12",
+    "23",
+    "29",
+    "6",
+    "21",
+    "27",
+    "24",
+    "25",
+    "10",
+    "26",
+    "28",
+    "5",
+    "3",
+    "17",
+    "13",
+    "4",
+    "16",
+    "20",
+    "2"
+   ],
+   "resolved_dosing_interval_indices": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+   ],
+   "resolved_time_intervals_hours": [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "point_estimates": {
+    "v": [
+     4.449758025991961,
+     12.703270134725171,
+     9.326309815837858,
+     7.40995087497786,
+     13.361002243940998,
+     5.996274620596778,
+     9.714275508652202,
+     16.904425764203097,
+     10.163895113129374,
+     12.144403057423654,
+     11.96273425865195,
+     6.580208874542012,
+     8.779833956520099,
+     9.033529424929023,
+     6.095171671080594,
+     8.97591080184277,
+     12.231439566221866,
+     6.300672954241445,
+     10.070217473326949,
+     9.502851982018209,
+     12.746795933247927,
+     12.646155104929043,
+     7.773787732564446,
+     9.12841800951234,
+     5.044767470757261,
+     6.990650308848665,
+     8.389030536226333,
+     7.055103151793151,
+     8.427848632093646,
+     5.063468430947054,
+     12.192711283474733,
+     8.876534687418507
+    ],
+    "cl": [
+     0.10827068134580516,
+     0.15555859970501676,
+     0.23850442257307994,
+     0.2190136545346649,
+     0.15479417522095265,
+     0.15745583721629433,
+     0.14231605773088832,
+     0.21711710408465162,
+     0.1765749813809897,
+     0.17967285636657498,
+     0.16018824846076737,
+     0.29979693955812153,
+     0.1191321514230378,
+     0.12308326962917074,
+     0.1260911618281721,
+     0.16756679539624705,
+     0.17704791232224046,
+     0.11680626926332809,
+     0.13948063243465167,
+     0.14136374066659582,
+     0.10527134551052555,
+     0.11908070791615105,
+     0.12580612924250612,
+     0.13759490818804715,
+     0.07053933073496325,
+     0.13511021352046107,
+     0.10593524510940557,
+     0.13255513943114797,
+     0.11116954707009281,
+     0.10280524940011794,
+     0.22878488736950336,
+     0.12916444767837604
+    ],
+    "cmax": [
+     12.9,
+     9.5,
+     7.6,
+     13.4,
+     7.3,
+     11.6,
+     9.9,
+     8.3,
+     12.9,
+     7.6,
+     17.6,
+     10.8,
+     8.9,
+     17.5,
+     8.9,
+     10.1,
+     8.6,
+     9.6,
+     10.0,
+     9.8,
+     8.2,
+     8.6,
+     11.0,
+     11.8,
+     11.9,
+     11.0,
+     10.4,
+     15.0,
+     14.4,
+     12.2,
+     6.6,
+     9.2
+    ],
+    "tmax": [
+     9.0,
+     24.0,
+     24.0,
+     3.0,
+     24.0,
+     2.0,
+     24.0,
+     24.0,
+     3.0,
+     24.0,
+     2.0,
+     9.0,
+     24.0,
+     6.0,
+     24.0,
+     24.0,
+     6.0,
+     24.0,
+     24.0,
+     24.0,
+     24.0,
+     24.0,
+     24.0,
+     24.0,
+     6.0,
+     12.0,
+     24.0,
+     9.0,
+     9.0,
+     9.0,
+     24.0,
+     24.0
+    ],
+    "c_avg": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "t_half": [
+     28.487280134861873,
+     56.60398007229002,
+     27.104341647567438,
+     23.45144446811494,
+     59.82874369544904,
+     26.396613301927797,
+     47.31316189728447,
+     53.96744354546034,
+     39.89849063595096,
+     46.85103197592834,
+     51.7636942962348,
+     15.213808505206826,
+     51.08375094424357,
+     50.872596009676236,
+     33.50632191489904,
+     37.12923703376032,
+     47.88640395874937,
+     37.38920625927304,
+     50.04381416561436,
+     46.59522326980191,
+     83.92982553282147,
+     73.61097283766173,
+     42.83081501308892,
+     45.98525693711507,
+     49.571867389475074,
+     35.863680661900176,
+     54.89044611933685,
+     36.892004936293674,
+     52.54801941253268,
+     34.13958807789454,
+     36.94012986038033,
+     47.63497310844578
+    ],
+    "auc_all": [
+     647.5,
+     599.4000000000001,
+     434.4,
+     377.1,
+     436.79999999999995,
+     442.04999999999995,
+     580.8,
+     533.4,
+     565.125,
+     516.0,
+     693.4,
+     315.99999999999994,
+     596.4000000000001,
+     808.5,
+     607.8,
+     609.0,
+     520.8,
+     633.6,
+     665.4000000000001,
+     616.8,
+     644.4,
+     584.4000000000001,
+     729.5999999999999,
+     693.0,
+     686.1000000000001,
+     667.7,
+     631.2,
+     751.35,
+     851.9999999999999,
+     728.3,
+     358.79999999999995,
+     602.4000000000001
+    ],
+    "auc_inf": [
+     692.7083035568779,
+     803.5557033621765,
+     469.59296935335516,
+     410.93328263583237,
+     600.7978004808781,
+     476.32403679625935,
+     737.7944672873746,
+     704.6888389794797,
+     639.9547609532735,
+     651.1835029844042,
+     842.7584501185405,
+     333.5591088667969,
+     780.6456853931678,
+     999.3234691487997,
+     689.9769875905919,
+     716.1323322811937,
+     638.2453117793987,
+     757.664811641964,
+     860.334498814532,
+     778.1344740970974,
+     1092.4150293918465,
+     881.754919310139,
+     890.2586914832013,
+     872.125295770388,
+     850.5893006759225,
+     740.1364959345284,
+     821.2564185805204,
+     852.4754338830799,
+     1079.4323010449934,
+     826.8060288359408,
+     417.4226763753015,
+     774.2068486910847
+    ],
+    "auc_tau": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "c_start": [
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "auc_last": [
+     647.5,
+     599.4000000000001,
+     434.4,
+     377.1,
+     436.79999999999995,
+     442.04999999999995,
+     580.8,
+     533.4,
+     565.125,
+     516.0,
+     693.4,
+     315.99999999999994,
+     596.4000000000001,
+     808.5,
+     607.8,
+     609.0,
+     520.8,
+     633.6,
+     665.4000000000001,
+     616.8,
+     644.4,
+     584.4000000000001,
+     729.5999999999999,
+     693.0,
+     686.1000000000001,
+     667.7,
+     631.2,
+     751.35,
+     851.9999999999999,
+     728.3,
+     358.79999999999995,
+     602.4000000000001
+    ],
+    "auc_interval": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "n_observations": [
+     12.0,
+     6.0,
+     6.0,
+     9.0,
+     6.0,
+     10.0,
+     6.0,
+     6.0,
+     10.0,
+     6.0,
+     11.0,
+     10.0,
+     6.0,
+     10.0,
+     6.0,
+     6.0,
+     8.0,
+     6.0,
+     6.0,
+     6.0,
+     6.0,
+     6.0,
+     6.0,
+     6.0,
+     10.0,
+     10.0,
+     6.0,
+     10.0,
+     9.0,
+     10.0,
+     6.0,
+     6.0
+    ],
+    "auc_interval_duration": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "terminal_rate_constant": [
+     0.02433181326116468,
+     0.012245555518794152,
+     0.025573289680775328,
+     0.029556694535484256,
+     0.011585521235216419,
+     0.02625894362400359,
+     0.01465019780467744,
+     0.01284380239312358,
+     0.0173727669771893,
+     0.014794704648471315,
+     0.013390604940079858,
+     0.0455603986551244,
+     0.013568838774515507,
+     0.013625158433591732,
+     0.02068705667904802,
+     0.018668500511596582,
+     0.014474822146950957,
+     0.018538697391791654,
+     0.013850806380705773,
+     0.014875927872399955,
+     0.008258651512255131,
+     0.009416356744647029,
+     0.01618337592567693,
+     0.015073247965273423,
+     0.013982672371691042,
+     0.019327273937510575,
+     0.01262782924104825,
+     0.01878854732229638,
+     0.013190738458063178,
+     0.02030332583329439,
+     0.018764069947230247,
+     0.014551224349007744
+    ],
+    "auc_all_interval_duration": [
+     120.0,
+     120.0,
+     120.0,
+     96.0,
+     120.0,
+     96.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     72.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0
+    ],
+    "auc_tau_interval_duration": [
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null,
+     null
+    ],
+    "auc_last_interval_duration": [
+     120.0,
+     120.0,
+     120.0,
+     96.0,
+     120.0,
+     96.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     72.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0,
+     120.0
+    ],
+    "selected_interval_dose_amount": [
+     75.0,
+     125.0,
+     112.0,
+     90.0,
+     93.0,
+     75.0,
+     105.0,
+     153.0,
+     113.0,
+     117.0,
+     135.0,
+     100.0,
+     93.0,
+     123.0,
+     87.0,
+     120.0,
+     113.0,
+     88.5,
+     120.0,
+     110.0,
+     115.0,
+     105.0,
+     112.0,
+     120.0,
+     60.0,
+     100.0,
+     87.0,
+     113.0,
+     120.0,
+     85.0,
+     95.5,
+     100.0
+    ]
+   },
+   "quantities": [
+    {
+     "name": "c_start",
+     "display_name": "Cstart",
+     "unit": "mg/L",
+     "explanation": "Concentration assigned to the start of the selected dosing interval."
+    },
+    {
+     "name": "selected_interval_dose_amount",
+     "display_name": "Dose amount",
+     "unit": "mg",
+     "explanation": "Total dose amount administered at the start of the selected dosing interval."
+    },
+    {
+     "name": "auc_interval",
+     "display_name": "AUC interval",
+     "unit": "mg/L*h",
+     "explanation": "Area under the concentration-time curve from the selected dose occasion through the endpoint of the requested interval."
+    },
+    {
+     "name": "auc_interval_duration",
+     "display_name": "AUCinterval duration",
+     "unit": "h",
+     "explanation": "Elapsed time from the selected dose occasion through the requested interval endpoint actually used for AUC interval."
+    },
+    {
+     "name": "auc_last",
+     "display_name": "AUClast",
+     "unit": "mg/L*h",
+     "explanation": "Area under the concentration-time curve from the selected dose occasion through the last positive measurable concentration within the requested interval."
+    },
+    {
+     "name": "auc_last_interval_duration",
+     "display_name": "AUClast interval duration",
+     "unit": "h",
+     "explanation": "Elapsed time from the selected dose occasion through the last positive measurable concentration actually used for AUClast."
+    },
+    {
+     "name": "auc_all",
+     "display_name": "AUCall",
+     "unit": "mg/L*h",
+     "explanation": "Area under the concentration-time curve from the selected dose occasion through the final concentration observation within the requested interval, including a retained zero or negative observation."
+    },
+    {
+     "name": "auc_all_interval_duration",
+     "display_name": "AUCall interval duration",
+     "unit": "h",
+     "explanation": "Elapsed time from the selected dose occasion through the final concentration observation actually used for AUCall."
+    },
+    {
+     "name": "auc_tau",
+     "display_name": "AUCtau",
+     "unit": "mg/L*h",
+     "explanation": "Area under the concentration-time curve from the interval start through start plus Tau, the subject's intended dosing interval in effect at that start, as stored in the DataVersion interval."
+    },
+    {
+     "name": "auc_tau_interval_duration",
+     "display_name": "AUCtau interval duration",
+     "unit": "h",
+     "explanation": "The subject's intended dosing interval in effect at the interval-of-interest start, read from its DataVersion Tau and used as the integration duration for AUCtau."
+    },
+    {
+     "name": "c_avg",
+     "display_name": "Cavg",
+     "unit": "mg/L",
+     "explanation": "Average concentration over the intended dosing interval: AUCtau divided by the subject's DataVersion Tau in effect at the interval-of-interest start."
+    },
+    {
+     "name": "auc_inf",
+     "display_name": "AUCinf",
+     "unit": "mg/L*h",
+     "explanation": "For a single-dose study, AUC from the selected dose through the last positive postdose concentration, plus extrapolation from that observation to infinity using Lambda-Z."
+    },
+    {
+     "name": "cmax",
+     "display_name": "Cmax",
+     "unit": "mg/L",
+     "explanation": "Maximum observed concentration in the selected dosing interval."
+    },
+    {
+     "name": "tmax",
+     "display_name": "Tmax",
+     "unit": "h",
+     "explanation": "Time of Cmax relative to the start of the requested dosing interval."
+    },
+    {
+     "name": "t_half",
+     "display_name": "Terminal half-life",
+     "unit": "h",
+     "explanation": "Terminal elimination half-life."
+    },
+    {
+     "name": "cl",
+     "display_name": "Clearance",
+     "unit": "L/h",
+     "explanation": "Apparent clearance derived from exposure and dose."
+    },
+    {
+     "name": "v",
+     "display_name": "Volume",
+     "unit": "L",
+     "explanation": "Apparent volume of distribution computed from clearance."
+    },
+    {
+     "name": "terminal_rate_constant",
+     "display_name": "Lambda z",
+     "unit": "1/h",
+     "explanation": "Terminal elimination rate constant estimated from the terminal phase."
+    },
+    {
+     "name": "n_observations",
+     "display_name": "N observations",
+     "unit": "count",
+     "explanation": "Number of concentration observations used in the selected dosing interval."
+    }
+   ],
+   "not_estimable_reasons": [
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    },
+    {
+     "c_avg": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_tau": [
+      "intended_tau_not_available_for_subject"
+     ],
+     "auc_interval": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_interval_duration": [
+      "open_ended_dosing_interval"
+     ],
+     "auc_tau_interval_duration": [
+      "intended_tau_not_available_for_subject"
+     ]
+    }
+   ],
+   "excluded_subjects": [],
+   "units": {
+    "v": "L",
+    "cl": "L/h",
+    "cmax": "mg/L",
+    "tmax": "h",
+    "c_avg": "mg/L",
+    "t_half": "h",
+    "auc_all": "mg/L*h",
+    "auc_inf": "mg/L*h",
+    "auc_tau": "mg/L*h",
+    "c_start": "mg/L",
+    "auc_last": "mg/L*h",
+    "auc_interval": "mg/L*h",
+    "n_observations": "count",
+    "auc_interval_duration": "h",
+    "terminal_rate_constant": "1/h",
+    "auc_all_interval_duration": "h",
+    "auc_tau_interval_duration": "h",
+    "auc_last_interval_duration": "h",
+    "selected_interval_dose_amount": "mg"
+   }
+  }
+ ],
+ "next_cursor": null,
+ "has_next_page": false
+}
