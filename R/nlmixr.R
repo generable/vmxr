@@ -50,6 +50,9 @@ vmx_nlmixr_default_cmt <- function() {
 #' `(ID, DVID, TIME)` group in that order, `NA` on dose rows and `1` for an
 #' observation with no same-time partner. The index is derived here in R and is
 #' deliberately not part of the DataVersion.
+#' rxode2 and nlmixr2 treat any extra column as a covariate, and `REPLICATE` is
+#' `NA` on dose rows, so drop it (`dplyr::select(-REPLICATE)`) before passing the
+#' table to a fit unless the model uses it explicitly.
 #'
 #' Columns: `ID` (dense integer per subject with admitted rows), `TIME` (hours on the selected
 #' time basis), `DV`, `AMT` (mg), `EVID` (0 observation / 1 dose), `MDV`, `CMT`,

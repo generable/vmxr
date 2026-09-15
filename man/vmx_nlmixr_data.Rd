@@ -76,6 +76,9 @@ carries a \code{REPLICATE} column: the 1-based rank of each observation within i
 \code{(ID, DVID, TIME)} group in that order, \code{NA} on dose rows and \code{1} for an
 observation with no same-time partner. The index is derived here in R and is
 deliberately not part of the DataVersion.
+rxode2 and nlmixr2 treat any extra column as a covariate, and \code{REPLICATE} is
+\code{NA} on dose rows, so drop it (\code{dplyr::select(-REPLICATE)}) before passing the
+table to a fit unless the model uses it explicitly.
 
 Columns: \code{ID} (dense integer per subject with admitted rows), \code{TIME} (hours on the selected
 time basis), \code{DV}, \code{AMT} (mg), \code{EVID} (0 observation / 1 dose), \code{MDV}, \code{CMT},
