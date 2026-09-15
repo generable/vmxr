@@ -1,5 +1,17 @@
 # vmxr 0.3.0
 
+* `vmx_nlmixr_data()` gains an optional `replicate` argument (AGE-108). With
+  `replicate = TRUE` the layout carries a `REPLICATE` column: the 1-based rank of
+  each observation within its subject, endpoint and time, `NA` on dose rows and
+  `1` for an observation with no same-time partner. The index is derived in R;
+  the DataVersion carries no replicate column. Drop `REPLICATE` before fitting,
+  since rxode2 and nlmixr2 treat extra columns as covariates. Behaviour change
+  for every caller, flag or not: observations that share a subject, endpoint and
+  time are now emitted in `gen_measurement_uuid` order, then source-row order,
+  instead of source order alone. The rows are the same; only their order within
+  such a group can change. The `endpoints` attribute also gains
+  `has_repeated_times`.
+
 * `vmx_data_versions(eligible_for_modeling=)` now filters correctly against both
   the 0.2.2 and 0.3 APIs (AGE-78). The 0.3 API dropped the flat
   `eligible_for_modeling` list filter for the basis-scoped
