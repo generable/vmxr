@@ -11,6 +11,7 @@ vmx_nlmixr_data(
   eligibility = c("after_qc", "before_qc", "all"),
   pd_markers = NULL,
   cmt = NULL,
+  replicate = FALSE,
   client = vmx_client()
 )
 }
@@ -38,13 +39,22 @@ names (an explicitly named marker that is ineligible is a usage error).}
 compartments; see \code{\link[=vmx_nlmixr_default_cmt]{vmx_nlmixr_default_cmt()}}. PD markers get compartments
 after the highest mapped value, in the order they are included.}
 
+\item{replicate}{If \code{TRUE}, add a \code{REPLICATE} column: the 1-based rank of each
+observation within its subject, endpoint and time (\code{(ID, DVID, TIME)}),
+ordered by \code{gen_measurement_uuid} then source-row order; \code{NA} on dose rows
+and \code{1} for an observation with no same-time partner. Off by default. The
+index is derived in R, not read from the DataVersion.}
+
 \item{client}{A \code{vmx_client}.}
 }
 \value{
 A tibble in NONMEM layout. The \code{"vmx"} attribute is a list with
 \code{data_version_id}, \code{time_basis}, \code{units}, \code{analyte}, \code{eligibility},
 \code{analysis_ready}, \code{cmt}, \code{endpoints} (a tibble of \code{dvid}, \code{name}, \code{cmt},
-\code{unit}), \code{dropped} (named integer counts), and \code{n_subjects}.
+\code{unit}, and \code{has_repeated_times} — whether the endpoint carries any
+observation that shares its time), \code{dropped} (named integer counts), and
+\code{n_subjects}. With \code{replicate = TRUE} the layout gains a \code{REPLICATE} column
+(see the argument).
 }
 \description{
 Assembles one event table from a DataVersion's prepared \code{pk}, \code{dosing},
@@ -57,6 +67,18 @@ Rows are ordered by subject and time; ties on \code{TIME} are ordered dose
 before observation, which is how rxode2 and nlmixr2 resolve them, so a
 pre-dose sample that shares its time with an IV bolus into the observation
 compartment must carry its own earlier time in the source data.
+
+Observations that share a subject, endpoint and time are always emitted in a
+deterministic order — by the measurement uuid (\code{gen_measurement_uuid}, the
+row identity on the pk/pd tables) and then source-row order — whether or not
+the replicate index is requested. With \code{replicate = TRUE} the layout also
+carries a \code{REPLICATE} column: the 1-based rank of each observation within its
+\code{(ID, DVID, TIME)} group in that order, \code{NA} on dose rows and \code{1} for an
+observation with no same-time partner. The index is derived here in R and is
+deliberately not part of the DataVersion.
+rxode2 and nlmixr2 treat any extra column as a covariate, and \code{REPLICATE} is
+\code{NA} on dose rows, so drop it (\code{dplyr::select(-REPLICATE)}) before passing the
+table to a fit unless the model uses it explicitly.
 
 Columns: \code{ID} (dense integer per subject with admitted rows), \code{TIME} (hours on the selected
 time basis), \code{DV}, \code{AMT} (mg), \code{EVID} (0 observation / 1 dose), \code{MDV}, \code{CMT},
