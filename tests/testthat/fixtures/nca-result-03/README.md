@@ -5,7 +5,7 @@ byte-for-byte by the "recorded 0.3 result" test in `test-nca.R` so the
 cursor-paged `items[]` reader is checked against a shape the server actually
 served, not only against hand-built mocks.
 
-- Source: the VeloMetrix **arv-staging** workspace, 2026-09-14, API contract 0.3
+- Source: a VeloMetrix **staging** workspace, 2026-09-14, API contract 0.3
   (vmx-api `5083fac`, NCA worker `nca/0.13.4`), the automatic NCA the
   event-router ran on a freshly formatted DataVersion (`inputs`:
   `time_basis = observed`, `bloq_handling = discard`). The body is kept whole:

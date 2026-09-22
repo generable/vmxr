@@ -211,7 +211,7 @@ test_that("vmx_nca_result reads a single-interval 0.3 items[] response", {
 })
 
 test_that("vmx_nca_result reads a recorded 0.3 result byte-for-byte", {
-  # Recorded from arv-staging (API 0.3, worker nca/0.13.4) on 2026-09-14; see
+  # Recorded from a staging workspace (API 0.3, worker nca/0.13.4) on 2026-09-14; see
   # fixtures/nca-result-03/README.md. Served as raw bytes so jsonlite's
   # re-serialisation cannot change nulls or empty objects on the way in.
   body <- readBin(
