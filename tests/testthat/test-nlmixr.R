@@ -427,7 +427,7 @@ test_that("a recorded API 0.3 DataVersion fits a one-compartment model in nlmixr
   skip_if(!identical(Sys.getenv("VMXR_TEST_NLMIXR2"), "true"),
           "set VMXR_TEST_NLMIXR2=true to run the nlmixr2 end-to-end fit")
   fixture <- function(name) {
-    jsonlite::fromJSON(test_path("fixtures", "staging-dv", paste0(name, ".json")), simplifyVector = FALSE)
+    jsonlite::fromJSON(test_path("fixtures", "test-03-dv", paste0(name, ".json")), simplifyVector = FALSE)
   }
   dv_body <- fixture("dv")
   httr2::local_mocked_responses(function(req) {
@@ -459,7 +459,7 @@ test_that("a recorded API 0.3 DataVersion fits a one-compartment model in nlmixr
 })
 
 
-# --- API 0.2.2 as deployed on the client workspaces (AGE-69) ------------------------------
+# --- API 0.2.2 per-basis export shape (AGE-69) ------------------------------
 # The DataVersion advertises a boolean `time_bases` map and an object recommendation, but
 # the table endpoint ignores `time_basis` (no echo) and serves the flat canonical table:
 # basis-named time columns, no `time_hours`, no eligibility flags. With the AGE-68 server
@@ -542,7 +542,7 @@ test_that("the 0.2.x per-basis export (echoed basis, single eligible_for_modelin
 
 test_that("a recorded API 0.2.2 per-basis export (test-022-dv fixtures) assembles from disk", {
   # Recorded-shape coverage for the deployed 0.2.2 path, the sibling of the 0.3
-  # staging-dv replay above: read the on-disk test-022-dv payloads (not hand-built
+  # test-03-dv replay above: read the on-disk test-022-dv payloads (not hand-built
   # mocks) and confirm the client handles the faithful 0.2.2 shape.
   fixture <- function(name) {
     jsonlite::fromJSON(test_path("fixtures", "test-022-dv", paste0(name, ".json")), simplifyVector = FALSE)

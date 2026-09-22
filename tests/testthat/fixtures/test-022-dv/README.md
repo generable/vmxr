@@ -1,12 +1,11 @@
 # test-022-dv fixture
 
-A recorded **API 0.2.2 (as deployed on the client workspaces)** DataVersion, the
-sibling of `staging-dv/` (which records the 0.3 shape). Used by the 0.2.2 replay
-test in `test-nlmixr.R` so the 0.2.2 table/DV path has recorded-shape coverage,
-not just hand-built mocks.
+A recorded **API 0.2.2** DataVersion, the sibling of `test-03-dv/` (which
+records the 0.3 shape). Used by the 0.2.2 replay test in `test-nlmixr.R` so the
+0.2.2 table/DV path has recorded-shape coverage, not just hand-built mocks.
 
-- Source: the **client** workspace per-basis export, API contract **0.2.2** after the
-  `9c0ac49` server hotfix (`vmx-api`), `GET /data-versions/{dv}` and
+- Records: API contract **0.2.2** per-basis export, after the `9c0ac49` server
+  hotfix (`vmx-api`), `GET /data-versions/{dv}` and
   `GET /data-versions/{dv}/tables/{domain}?time_basis=observed` for
   subjects / pk / dosing / pd / covariates. `dv.json` is trimmed to the fields
   the client reads.
@@ -28,6 +27,6 @@ not just hand-built mocks.
   canonical path.
 - Identifiers: every `dv_` id is an obviously fake constant and every
   `gen_*_uuid` a deterministic fake token; they do not resolve anywhere.
-- Regenerate: point `vmx_client()` at an client 0.2.2 workspace, fetch the same six
-  payloads for a ready DataVersion, trim `dv.json`, and re-run the id/uuid
-  rewrite.
+- Regenerate: point `vmx_client()` at any workspace serving that contract
+  version, fetch the same six payloads for a ready DataVersion, trim `dv.json`,
+  and re-run the id/uuid rewrite.
