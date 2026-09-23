@@ -30,7 +30,7 @@
   the same argument narrows to one basis against a 0.3 server.
 
 * Table fetching and `vmx_nlmixr_data()` work against both the API 0.3 shape
-  and the API 0.2.2 shape deployed on the client workspaces (AGE-69). A server that
+  and the API 0.2.2 shape still deployed on some workspaces (AGE-69). A server that
   advertises `time_bases` but ignores the `time_basis` parameter is no longer
   refused: the result records `"basis_echoed" = FALSE` and the assembler
   falls back to the basis-named time column. When the before/after-QC
