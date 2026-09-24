@@ -1,5 +1,14 @@
 # vmxr 0.3.0
 
+* `vmx_data_version_export()` called without `dest` no longer returns the
+  signed `download_url` (AGE-240). The server's download link is short-lived —
+  its window is narrowing to 60 seconds — so handing it back to an interactive
+  caller invited them to copy a link that would refuse them moments later. The
+  no-`dest` path now returns the rest of the envelope (its size, file list and
+  data version) with `download_url` removed; the link's presence and shape are
+  still validated first. To obtain a bundle, pass `dest` — that path is
+  unchanged, minting and streaming in one step, and stays correct at any window.
+
 * `vmx_nlmixr_data()` gains an optional `replicate` argument (AGE-108). With
   `replicate = TRUE` the layout carries a `REPLICATE` column: the 1-based rank of
   each observation within its subject, endpoint and time, `NA` on dose rows and
