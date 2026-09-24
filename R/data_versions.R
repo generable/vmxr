@@ -361,10 +361,11 @@ vmx_data_version_export <- function(dv, dest = NULL, client = vmx_client()) {
     nonempty = TRUE
   )
   if (is.null(dest)) {
-    # The signed URL is short-lived (a 60-second window); handing it back invites
-    # an analyst to copy it and use it later, once it has already expired. Return
-    # the rest of the envelope (size, file list, data version); a usable bundle is
-    # obtained by passing `dest`. The URL was validated above before being dropped.
+    # The signed URL is short-lived (its window is narrowing to 60s, GEN-3070);
+    # handing it back invites an analyst to copy it and use it later, once it has
+    # already expired. Return the rest of the envelope (size, file list, data
+    # version); a usable bundle is obtained by passing `dest`. The URL was
+    # validated above before being dropped.
     envelope[["download_url"]] <- NULL
     return(envelope)
   }
