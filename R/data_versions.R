@@ -330,14 +330,19 @@ vmx_resolve_time_basis <- function(dv, time_basis = NULL) {
 
 #' Export a data version
 #'
-#' Fetches the signed-URL export envelope (`GET /data-versions/{id}/export`).
-#' When `dest` is supplied the bundle is streamed to that path; otherwise the
-#' parsed envelope (including the signed `download_url`) is returned.
+#' Fetches the export envelope (`GET /data-versions/{id}/export`). Pass `dest`
+#' to obtain the bundle: it is streamed to that path via the server's signed
+#' download URL. That URL is short-lived — its life is measured in seconds — and
+#' is not returned. Without `dest`, the parsed envelope is returned with its
+#' `download_url` removed, leaving the export's details (its size, its file list,
+#' its data version).
 #'
 #' @param dv A data-version id or `vmx_data_version`.
-#' @param dest Optional local file path to stream the bundle to.
+#' @param dest Optional local file path to stream the bundle to. Pass it to
+#'   obtain the bundle; without it no download link is returned.
 #' @param client A `vmx_client`.
-#' @return The export envelope (list), or, when `dest` is set, `dest` invisibly.
+#' @return Without `dest`, the export envelope (list) minus its short-lived
+#'   `download_url`. With `dest`, `dest` invisibly once the bundle is streamed.
 #' @export
 vmx_data_version_export <- function(dv, dest = NULL, client = vmx_client()) {
   data_version_id <- vmx_id(dv, "dv")
@@ -356,6 +361,12 @@ vmx_data_version_export <- function(dv, dest = NULL, client = vmx_client()) {
     nonempty = TRUE
   )
   if (is.null(dest)) {
+    # The signed URL is short-lived (its window is narrowing to 60s, GEN-3070);
+    # handing it back invites an analyst to copy it and use it later, once it has
+    # already expired. Return the rest of the envelope (size, file list, data
+    # version); a usable bundle is obtained by passing `dest`. The URL was
+    # validated above before being dropped.
+    envelope[["download_url"]] <- NULL
     return(envelope)
   }
   if (!is.character(dest) || length(dest) != 1L || is.na(dest) ||

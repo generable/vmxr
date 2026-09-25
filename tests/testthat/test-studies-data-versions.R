@@ -356,7 +356,7 @@ test_that("vmx_data_version_create validates its upload composition", {
   )
 })
 
-test_that("vmx_data_version_export requires the canonical matching envelope", {
+test_that("vmx_data_version_export without dest drops the signed download_url", {
   cm <- capturing_mock(list(
     data_version_id = "dv_1",
     download_url = "https://storage.test/signed",
@@ -366,7 +366,12 @@ test_that("vmx_data_version_export requires the canonical matching envelope", {
   ))
   httr2::local_mocked_responses(cm$mock)
   out <- vmx_data_version_export("dv_1", client = con)
-  expect_equal(out$download_url, "https://storage.test/signed")
+  # The short-lived URL is not handed back, but the rest of the envelope is.
+  expect_false("download_url" %in% names(out))
+  expect_equal(out$data_version_id, "dv_1")
+  expect_equal(out$expires_at, "2026-01-01T01:00:00Z")
+  expect_equal(out$byte_size, 10)
+  expect_true("files" %in% names(out))
 
   cm2 <- capturing_mock(list(
     data_version_id = "dv_other",
@@ -377,6 +382,40 @@ test_that("vmx_data_version_export requires the canonical matching envelope", {
     vmx_data_version_export("dv_1", client = con),
     class = "vmx_response_error"
   )
+})
+
+test_that("vmx_data_version_export still validates a missing download_url", {
+  # Presence/shape of the URL is checked before it is dropped, so a response
+  # missing it is a server error on the no-dest path too.
+  cm <- capturing_mock(list(
+    data_version_id = "dv_1",
+    expires_at = "2026-01-01T01:00:00Z"
+  ))
+  httr2::local_mocked_responses(cm$mock)
+  expect_error(
+    vmx_data_version_export("dv_1", client = con),
+    class = "vmx_response_error"
+  )
+})
+
+test_that("vmx_data_version_export with dest streams from the signed URL", {
+  # Two requests: the export envelope, then the anonymous GET to the signed URL.
+  # `capturing_mock` records the last request, so it captures the download call,
+  # proving the signed `download_url` was used to fetch the bundle.
+  cm <- capturing_mock(list(
+    list(
+      data_version_id = "dv_1",
+      download_url = "https://storage.test/signed",
+      byte_size = 4,
+      files = list()
+    ),
+    list(ok = TRUE)
+  ))
+  httr2::local_mocked_responses(cm$mock)
+  dest <- withr::local_tempfile()
+  out <- vmx_data_version_export("dv_1", dest = dest, client = con)
+  expect_equal(out, dest)
+  expect_equal(cm$captured$req$url, "https://storage.test/signed")
 })
 
 test_that("archive/unarchive PATCH the right body", {

@@ -9,15 +9,20 @@ vmx_data_version_export(dv, dest = NULL, client = vmx_client())
 \arguments{
 \item{dv}{A data-version id or \code{vmx_data_version}.}
 
-\item{dest}{Optional local file path to stream the bundle to.}
+\item{dest}{Optional local file path to stream the bundle to. Pass it to
+obtain the bundle; without it no download link is returned.}
 
 \item{client}{A \code{vmx_client}.}
 }
 \value{
-The export envelope (list), or, when \code{dest} is set, \code{dest} invisibly.
+Without \code{dest}, the export envelope (list) minus its short-lived
+\code{download_url}. With \code{dest}, \code{dest} invisibly once the bundle is streamed.
 }
 \description{
-Fetches the signed-URL export envelope (\code{GET /data-versions/{id}/export}).
-When \code{dest} is supplied the bundle is streamed to that path; otherwise the
-parsed envelope (including the signed \code{download_url}) is returned.
+Fetches the export envelope (\code{GET /data-versions/{id}/export}). Pass \code{dest}
+to obtain the bundle: it is streamed to that path via the server's signed
+download URL. That URL is short-lived — its life is measured in seconds — and
+is not returned. Without \code{dest}, the parsed envelope is returned with its
+\code{download_url} removed, leaving the export's details (its size, its file list,
+its data version).
 }
