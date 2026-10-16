@@ -1,0 +1,54 @@
+# Fail CI if a disallowed client / workspace / study identifier appears anywhere in
+# the working tree -- file contents OR file paths. See AGE-223.
+#
+# This complements the testthat guard (tests/testthat/test-no-client-identifiers.R):
+# the r-universe `R CMD check` runs tests in a sandbox that cannot see R/ sources or
+# README.md, so this job runs the SAME scanner over the full checkout to cover them.
+#
+# The identifier list is not in this repository; the job reads it from the
+# VMXR_FORBIDDEN_IDENTIFIERS repository secret, one identifier per line. Where that
+# secret is not available to the run -- for example a pull request from a fork --
+# the variable arrives empty and the job is a no-op that reports as much and
+# succeeds. The job never echoes the variable, and reports a hit by file location
+# and count only.
+name: Scrub client identifiers
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  scrub:
+    name: No disallowed identifiers in tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - name: Scan working tree for disallowed identifiers
+        env:
+          VMXR_FORBIDDEN_IDENTIFIERS: ${{ secrets.VMXR_FORBIDDEN_IDENTIFIERS }}
+        run: |
+          Rscript -e '
+            source("tests/testthat/helper-scrub.R")
+            forbidden <- scrub_forbidden()
+            if (!length(forbidden)) {
+              cat("VMXR_FORBIDDEN_IDENTIFIERS is not set for this run;",
+                  "nothing to scan for. Skipping.\n")
+              quit(status = 0)
+            }
+            hits <- scrub_scan(".", forbidden)
+            if (nrow(hits) > 0) {
+              cat(sprintf(
+                "A configured identifier matched in %d location(s); the matched text is not printed.\n",
+                nrow(hits)))
+              for (i in seq_len(nrow(hits)))
+                cat(sprintf("  - %s [%s]\n", hits$file[i], hits$where[i]))
+              quit(status = 1)
+            }
+            cat("OK: no disallowed identifiers in the working tree.\n")
+          '
