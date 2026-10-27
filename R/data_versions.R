@@ -562,8 +562,9 @@ print.vmx_model_data <- function(x, ...) {
 #' `iObs` observation index must be derived and verified against real data
 #' before shipping (this is the error-prone derivation the design flags); see
 #' the package NEWS. When implemented it should reuse the event assembly in
-#' [vmx_nlmixr_data()] (eligibility admission, basis selection, dose and
-#' censoring encoding) and only add the ragged indexing on top.
+#' [vmx_nlmixr_data()] (eligibility admission, basis selection, PK and PD
+#' specimen selection, dose and censoring encoding) and only add the ragged
+#' indexing on top.
 #'
 #' @param dv A data-version id or `vmx_data_version`.
 #' @param analyte Analyte to assemble.

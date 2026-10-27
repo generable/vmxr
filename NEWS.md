@@ -1,5 +1,38 @@
 # vmxr 0.3.0
 
+* `vmx_nlmixr_data()` is specimen-aware. A marker measured in more than one
+  specimen is one marker with one input per specimen (dataversion-schema §4.2,
+  §11.6; api-contract §5.6.2), and the specimen is always the caller's choice:
+  - the new `pk_specimen` argument names one recorded PK specimen or
+    `vmx_all_specimens()` to pool them. It is required when the PK data records
+    more than one specimen; without it the call stops with an error that names
+    the specimens. The DataVersion's recommended specimen is never used
+    implicitly.
+  - `pd_markers` accepts a named list mapping each marker to specimen names or
+    `vmx_all_specimens()`, or `vmx_pd_marker()` selections as the modeling
+    requests take them (their `direction` is ignored). Each selected marker-and-specimen pair is its own
+    endpoint with its own `DVID` and compartment; `pd_markers = TRUE` gives
+    every eligible pair its own endpoint and never pools. A marker named by a
+    bare string must be recorded in a single specimen.
+  - each scope is admitted by its own recorded verdict on the selected basis:
+    PD pairs by (`gen_uuid`, `specimen_type`) rather than by marker uuid alone,
+    which let one specimen's verdict overwrite another's; one PK specimen by
+    `pk_marker_eligibility`; PK All specimens by `pk_modeling_eligibility`; PD
+    All specimens by the marker-analysis All-specimens verdict (or, without
+    marker-analysis metadata, by its recorded pair verdicts). A scoped verdict
+    that is not on the DataVersion itself is read from
+    `GET /data-versions/{id}/marker-analysis`.
+  - pooling specimens that do not share one explicitly known unit is an error
+    that names the units found, instead of an `NA` unit.
+  - the layout gains a `specimen_type` column (each observation's own recorded
+    specimen, `NA` on dose rows), the `endpoints` attribute gains
+    `specimen_type` and `all_specimens`, and the `"vmx"` attribute gains
+    `pk_specimen`.
+
+  A DataVersion that predates specimens (no `specimen_type` column, verdicts
+  keyed by marker uuid) is assembled exactly as before, without the new
+  columns; its `"vmx"` attribute only gains `pk_specimen = NULL`.
+
 * NCA runs, modeling previews and model builds now state their specimens, as
   the API requires (api-contract §5.6.2). Breaking change:
   * `vmx_nca()`, `vmx_modeling_options()` and `vmx_model_build()` take a

@@ -12,14 +12,16 @@ vmx_nlmixr_data(
   pd_markers = NULL,
   cmt = NULL,
   replicate = FALSE,
-  client = vmx_client()
+  client = vmx_client(),
+  pk_specimen = NULL
 )
 }
 \arguments{
 \item{dv}{A data-version id (\code{dv_...}) or \code{vmx_data_version}.}
 
 \item{analyte}{PK analyte to assemble, matched against \code{biomarker_name} or
-\code{biomarker_code}. Required when the PK table carries more than one analyte.}
+\code{biomarker_code}. Required when the PK table carries more than one analyte.
+Specimens of one analyte are chosen with \code{pk_specimen}.}
 
 \item{time_basis}{Time basis to project on (e.g. \code{"observed"}). Defaults to
 the DataVersion's recommended basis; a basis the DataVersion does not list
@@ -31,30 +33,45 @@ an explicit one.}
 \code{"all"} (no filter). The latter two are for review only.}
 
 \item{pd_markers}{PD markers to include as additional observation endpoints:
-\code{NULL}/\code{FALSE} (default, PK only), \code{TRUE} (every marker the DataVersion
-marks eligible on the selected basis), or a character vector of marker
-names (an explicitly named marker that is ineligible is a usage error).}
+\code{NULL}/\code{FALSE} (default, PK only); \code{TRUE} (every marker-and-specimen pair
+the DataVersion marks eligible on the selected basis, each its own endpoint;
+specimens are never pooled); a character vector of marker names, each
+recorded in a single specimen; or a named list mapping each marker name to
+one or more specimen names (one endpoint per specimen) or to
+\code{\link[=vmx_all_specimens]{vmx_all_specimens()}} (one pooled endpoint), e.g.
+\code{list(effect = c("plasma", "serum"), resp = vmx_all_specimens())}; or
+\code{\link[=vmx_pd_marker]{vmx_pd_marker()}} selections (one, or an unnamed list), as the modeling
+requests take them, whose \code{direction} is ignored here. An explicitly
+requested scope that is ineligible is a usage error.}
 
 \item{cmt}{Named integer vector mapping dosing routes and \code{"observation"} to
 compartments; see \code{\link[=vmx_nlmixr_default_cmt]{vmx_nlmixr_default_cmt()}}. PD markers get compartments
 after the highest mapped value, in the order they are included.}
 
 \item{replicate}{If \code{TRUE}, add a \code{REPLICATE} column: the 1-based rank of each
-observation within its subject, endpoint and time (\code{(ID, DVID, TIME)}),
+observation within its subject, endpoint and time (\verb{(ID, DVID, TIME)}),
 ordered by \code{gen_measurement_uuid} then source-row order; \code{NA} on dose rows
 and \code{1} for an observation with no same-time partner. Off by default. The
 index is derived in R, not read from the DataVersion.}
 
 \item{client}{A \code{vmx_client}.}
+
+\item{pk_specimen}{PK specimen to assemble: one recorded specimen name (e.g.
+\code{"plasma"}) or \code{\link[=vmx_all_specimens]{vmx_all_specimens()}} to pool every specimen. Required when
+the PK data records more than one specimen; with one or none it may be
+omitted.}
 }
 \value{
 A tibble in NONMEM layout. The \code{"vmx"} attribute is a list with
-\code{data_version_id}, \code{time_basis}, \code{units}, \code{analyte}, \code{eligibility},
-\code{analysis_ready}, \code{cmt}, \code{endpoints} (a tibble of \code{dvid}, \code{name}, \code{cmt},
-\code{unit}, and \code{has_repeated_times} — whether the endpoint carries any
-observation that shares its time), \code{dropped} (named integer counts), and
-\code{n_subjects}. With \code{replicate = TRUE} the layout gains a \code{REPLICATE} column
-(see the argument).
+\code{data_version_id}, \code{time_basis}, \code{units}, \code{analyte}, \code{pk_specimen} (the
+accepted PK scope, \code{list(specimen_type = )} or \code{list(all_specimens = TRUE)},
+or \code{NULL} when no specimen is recorded), \code{eligibility}, \code{analysis_ready},
+\code{cmt}, \code{endpoints} (a tibble of \code{dvid}, \code{name}, \code{cmt}, \code{unit},
+\code{has_repeated_times} — whether the endpoint carries any observation that
+shares its time — and, when the DataVersion records specimens,
+\code{specimen_type} (\code{NA} for a pooled endpoint) and \code{all_specimens}),
+\code{dropped} (named integer counts), and \code{n_subjects}. With \code{replicate = TRUE}
+the layout gains a \code{REPLICATE} column (see the argument).
 }
 \description{
 Assembles one event table from a DataVersion's prepared \code{pk}, \code{dosing},
@@ -73,7 +90,7 @@ deterministic order — by the measurement uuid (\code{gen_measurement_uuid}, th
 row identity on the pk/pd tables) and then source-row order — whether or not
 the replicate index is requested. With \code{replicate = TRUE} the layout also
 carries a \code{REPLICATE} column: the 1-based rank of each observation within its
-\code{(ID, DVID, TIME)} group in that order, \code{NA} on dose rows and \code{1} for an
+\verb{(ID, DVID, TIME)} group in that order, \code{NA} on dose rows and \code{1} for an
 observation with no same-time partner. The index is derived here in R and is
 deliberately not part of the DataVersion.
 rxode2 and nlmixr2 treat any extra column as a covariate, and \code{REPLICATE} is
@@ -86,8 +103,25 @@ time basis), \code{DV}, \code{AMT} (mg), \code{EVID} (0 observation / 1 dose), \
 DataVersion already expands doses per administration), \code{CENS} / \code{LIMIT}
 (censoring: \code{CENS = 1} with \code{DV = lloq} and \code{LIMIT = 0} for BLQ rows,
 \code{CENS = -1} with \code{DV = uloq} and \code{LIMIT = Inf} for ALQ rows), \code{DVID}
-(only when PD markers are included: 1 = PK, 2.. = PD markers, and dose rows
-carry 1), \code{subject_id}, and one column per subject-level covariate.
+(only when PD markers are included: 1 = PK, 2.. = one per PD endpoint, and
+dose rows carry 1), \code{subject_id}, \code{specimen_type} (only when the DataVersion
+records specimens: each observation's own recorded specimen, also inside a
+pooled endpoint, and \code{NA} on dose rows), and one column per subject-level
+covariate.
+
+A marker measured in more than one specimen (plasma and serum, say) is one
+marker with one input per specimen. The specimen is always the caller's
+choice: with more than one PK specimen, \code{pk_specimen} is required, and a PD
+marker with more than one specimen needs its specimens named in
+\code{pd_markers}. The DataVersion's recommended PK specimen is never used as an
+implicit choice. Each selection is admitted by the DataVersion's recorded
+eligibility verdict for that scope on the selected basis: the specimen's own
+verdict (by marker and specimen), or the All-specimens verdict when pooled.
+A scope verdict that is not on the DataVersion itself is read from its
+marker-analysis metadata. Pooling specimens that do not share one explicitly
+known unit is an error that names the units found.
+A DataVersion that predates specimens (no \code{specimen_type} column) is
+assembled exactly as before.
 
 Only rows the DataVersion marks as eligible for modeling are kept; the
 after-QC flag is the contract's mandatory admission filter, and the result

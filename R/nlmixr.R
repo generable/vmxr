@@ -60,8 +60,25 @@ vmx_nlmixr_default_cmt <- function() {
 #' DataVersion already expands doses per administration), `CENS` / `LIMIT`
 #' (censoring: `CENS = 1` with `DV = lloq` and `LIMIT = 0` for BLQ rows,
 #' `CENS = -1` with `DV = uloq` and `LIMIT = Inf` for ALQ rows), `DVID`
-#' (only when PD markers are included: 1 = PK, 2.. = PD markers, and dose rows
-#' carry 1), `subject_id`, and one column per subject-level covariate.
+#' (only when PD markers are included: 1 = PK, 2.. = one per PD endpoint, and
+#' dose rows carry 1), `subject_id`, `specimen_type` (only when the DataVersion
+#' records specimens: each observation's own recorded specimen, also inside a
+#' pooled endpoint, and `NA` on dose rows), and one column per subject-level
+#' covariate.
+#'
+#' A marker measured in more than one specimen (plasma and serum, say) is one
+#' marker with one input per specimen. The specimen is always the caller's
+#' choice: with more than one PK specimen, `pk_specimen` is required, and a PD
+#' marker with more than one specimen needs its specimens named in
+#' `pd_markers`. The DataVersion's recommended PK specimen is never used as an
+#' implicit choice. Each selection is admitted by the DataVersion's recorded
+#' eligibility verdict for that scope on the selected basis: the specimen's own
+#' verdict (by marker and specimen), or the All-specimens verdict when pooled.
+#' A scope verdict that is not on the DataVersion itself is read from its
+#' marker-analysis metadata. Pooling specimens that do not share one explicitly
+#' known unit is an error that names the units found.
+#' A DataVersion that predates specimens (no `specimen_type` column) is
+#' assembled exactly as before.
 #'
 #' Only rows the DataVersion marks as eligible for modeling are kept; the
 #' after-QC flag is the contract's mandatory admission filter, and the result
@@ -75,6 +92,7 @@ vmx_nlmixr_default_cmt <- function() {
 #' @param dv A data-version id (`dv_...`) or `vmx_data_version`.
 #' @param analyte PK analyte to assemble, matched against `biomarker_name` or
 #'   `biomarker_code`. Required when the PK table carries more than one analyte.
+#'   Specimens of one analyte are chosen with `pk_specimen`.
 #' @param time_basis Time basis to project on (e.g. `"observed"`). Defaults to
 #'   the DataVersion's recommended basis; a basis the DataVersion does not list
 #'   as available is refused, and a DataVersion with no recommended basis needs
@@ -83,9 +101,16 @@ vmx_nlmixr_default_cmt <- function() {
 #'   `"after_qc"` (default, the contract's admission filter), `"before_qc"`, or
 #'   `"all"` (no filter). The latter two are for review only.
 #' @param pd_markers PD markers to include as additional observation endpoints:
-#'   `NULL`/`FALSE` (default, PK only), `TRUE` (every marker the DataVersion
-#'   marks eligible on the selected basis), or a character vector of marker
-#'   names (an explicitly named marker that is ineligible is a usage error).
+#'   `NULL`/`FALSE` (default, PK only); `TRUE` (every marker-and-specimen pair
+#'   the DataVersion marks eligible on the selected basis, each its own endpoint;
+#'   specimens are never pooled); a character vector of marker names, each
+#'   recorded in a single specimen; or a named list mapping each marker name to
+#'   one or more specimen names (one endpoint per specimen) or to
+#'   [vmx_all_specimens()] (one pooled endpoint), e.g.
+#'   `list(effect = c("plasma", "serum"), resp = vmx_all_specimens())`; or
+#'   [vmx_pd_marker()] selections (one, or an unnamed list), as the modeling
+#'   requests take them, whose `direction` is ignored here. An explicitly
+#'   requested scope that is ineligible is a usage error.
 #' @param cmt Named integer vector mapping dosing routes and `"observation"` to
 #'   compartments; see [vmx_nlmixr_default_cmt()]. PD markers get compartments
 #'   after the highest mapped value, in the order they are included.
@@ -95,19 +120,26 @@ vmx_nlmixr_default_cmt <- function() {
 #'   and `1` for an observation with no same-time partner. Off by default. The
 #'   index is derived in R, not read from the DataVersion.
 #' @param client A `vmx_client`.
+#' @param pk_specimen PK specimen to assemble: one recorded specimen name (e.g.
+#'   `"plasma"`) or [vmx_all_specimens()] to pool every specimen. Required when
+#'   the PK data records more than one specimen; with one or none it may be
+#'   omitted.
 #' @return A tibble in NONMEM layout. The `"vmx"` attribute is a list with
-#'   `data_version_id`, `time_basis`, `units`, `analyte`, `eligibility`,
-#'   `analysis_ready`, `cmt`, `endpoints` (a tibble of `dvid`, `name`, `cmt`,
-#'   `unit`, and `has_repeated_times` — whether the endpoint carries any
-#'   observation that shares its time), `dropped` (named integer counts), and
-#'   `n_subjects`. With `replicate = TRUE` the layout gains a `REPLICATE` column
-#'   (see the argument).
+#'   `data_version_id`, `time_basis`, `units`, `analyte`, `pk_specimen` (the
+#'   accepted PK scope, `list(specimen_type = )` or `list(all_specimens = TRUE)`,
+#'   or `NULL` when no specimen is recorded), `eligibility`, `analysis_ready`,
+#'   `cmt`, `endpoints` (a tibble of `dvid`, `name`, `cmt`, `unit`,
+#'   `has_repeated_times` — whether the endpoint carries any observation that
+#'   shares its time — and, when the DataVersion records specimens,
+#'   `specimen_type` (`NA` for a pooled endpoint) and `all_specimens`),
+#'   `dropped` (named integer counts), and `n_subjects`. With `replicate = TRUE`
+#'   the layout gains a `REPLICATE` column (see the argument).
 #' @seealso [vmx_model_data()] for the underlying tidy tables.
 #' @export
 vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
                             eligibility = c("after_qc", "before_qc", "all"),
                             pd_markers = NULL, cmt = NULL, replicate = FALSE,
-                            client = vmx_client()) {
+                            client = vmx_client(), pk_specimen = NULL) {
   eligibility <- match.arg(eligibility)
   strict <- identical(eligibility, "after_qc")
   cmt <- vmx_nlmixr_cmt_map(cmt)
@@ -117,7 +149,8 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
   if (!is.null(analyte)) {
     analyte <- vmx_nonempty_strings(analyte, "analyte", exactly_one = TRUE)
   }
-  pd_selection <- vmx_nlmixr_pd_selection(pd_markers)
+  pk_selection <- vmx_nlmixr_specimen_pk_arg(pk_specimen)
+  pd_selection <- vmx_nlmixr_specimen_pd_arg(pd_markers)
   if (!strict) {
     cli::cli_warn(c(
       "!" = "`eligibility = \"{eligibility}\"` admits rows the DataVersion does not mark eligible for modeling.",
@@ -145,12 +178,20 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
   subjects <- vmx_nlmixr_subject_map(md$subjects)
 
   # ---- PK observations ----------------------------------------------------
+  specimen_ctx <- vmx_nlmixr_specimen_context(md$meta, basis, eligibility, client)
   pk <- vmx_nlmixr_admit(md$pk, eligibility, "pk")
   dropped$pk_ineligible <- pk$n_dropped
+  pk_admit_flag <- pk$flag
   pk <- pk$rows
   pk_analyte <- vmx_nlmixr_select_analyte(pk, analyte, all_rows = md$pk)
   dropped$pk_other_analytes <- nrow(pk) - nrow(pk_analyte$rows)
-  pk <- pk_analyte$rows
+  # Specimen scope of the selected analyte, offered from its rows before admission.
+  pk_scope <- vmx_nlmixr_specimen_pk_scope(
+    pk_analyte$rows, md$pk[vmx_nlmixr_marker_key(md$pk) %in% pk_analyte$name, , drop = FALSE],
+    pk_selection, specimen_ctx
+  )
+  if (!is.null(pk_selection)) dropped$pk_other_specimens <- pk_scope$n_dropped
+  pk <- pk_scope$rows
   pk_obs <- vmx_nlmixr_observations(
     pk,
     basis = basis,
@@ -168,13 +209,18 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
   dropped$dosing_unencodable <- doses$n_dropped
 
   # ---- PD endpoints (optional) --------------------------------------------
+  # One endpoint (DVID) per selected marker-and-specimen pair, or per pooled
+  # marker; `specimen_type` / `all_specimens` record the scope of each.
   endpoints <- tibble::tibble(
     dvid = 1L,
     name = pk_analyte$name,
     cmt = unname(cmt[["observation"]]),
-    unit = vmx_nlmixr_unit(pk, md$meta$units$pk_concentration)
+    unit = vmx_nlmixr_unit(pk, md$meta$units$pk_concentration),
+    specimen_type = if (isTRUE(pk_scope$scope$all_specimens)) NA_character_ else pk_scope$scope$specimen_type %||% NA_character_,
+    all_specimens = isTRUE(pk_scope$scope$all_specimens)
   )
   pd_parts <- list()
+  specimen_aware <- length(vmx_nlmixr_specimen_values(md$pk)) > 0L || !is.null(pk_selection)
   if (!isFALSE(pd_selection)) {
     if (is.null(md$pd)) {
       vmx_abort(
@@ -185,14 +231,15 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     pd <- vmx_nlmixr_admit(md$pd, eligibility, "pd")
     dropped$pd_ineligible <- pd$n_dropped
     pd <- pd$rows
-    marker_sel <- vmx_nlmixr_pd_markers(pd, pd_selection, md$meta, basis, eligibility, all_rows = md$pd)
+    marker_sel <- vmx_nlmixr_specimen_pd_select(pd, md$pd, pd_selection, specimen_ctx)
     dropped$pd_markers_ineligible <- marker_sel$n_dropped
-    keys <- vmx_nlmixr_marker_key(pd)
+    specimen_aware <- specimen_aware || length(vmx_nlmixr_specimen_values(md$pd)) > 0L ||
+      any(vapply(marker_sel$selections, function(x) x$all_specimens, logical(1)))
     next_cmt <- max(cmt)
     unencodable <- 0L
-    for (k in seq_along(marker_sel$markers)) {
-      marker <- marker_sel$markers[[k]]
-      rows_k <- pd[which(keys == marker), , drop = FALSE]
+    for (k in seq_along(marker_sel$selections)) {
+      sel <- marker_sel$selections[[k]]
+      rows_k <- pd[sel$rows, , drop = FALSE]
       next_cmt <- next_cmt + 1L
       obs_k <- vmx_nlmixr_observations(
         rows_k,
@@ -206,12 +253,19 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
       pd_parts[[k]] <- obs_k$rows
       endpoints <- rbind(endpoints, tibble::tibble(
         dvid = 1L + k,
-        name = marker,
+        name = sel$marker,
         cmt = next_cmt,
-        unit = vmx_nlmixr_unit(rows_k, NA_character_)
+        unit = sel$unit %||% vmx_nlmixr_unit(rows_k, NA_character_),
+        specimen_type = sel$specimen_type,
+        all_specimens = sel$all_specimens
       ))
     }
     dropped$pd_unencodable <- unencodable
+  }
+  if (!specimen_aware) {
+    # A DataVersion that predates specimens keeps its marker-level layout.
+    endpoints$specimen_type <- NULL
+    endpoints$all_specimens <- NULL
   }
 
   # ---- assemble -----------------------------------------------------------
@@ -270,6 +324,9 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     endpoints$has_repeated_times <- rep(FALSE, nrow(endpoints))
   }
   if (isTRUE(replicate)) events$REPLICATE <- rep_idx
+  # Each observation's recorded specimen (`NA` on dose rows), when the source
+  # tables record specimens.
+  if (specimen_aware) events$specimen_type <- events[[".specimen"]]
 
   covariates <- vmx_nlmixr_covariates(md$covariates, eligibility)
   if (!is.null(covariates)) {
@@ -300,6 +357,7 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     # REPLICATE sits with the event columns, right after DVID.
     core <- append(core, "REPLICATE", after = match("DVID", core))
   }
+  if (specimen_aware) core <- c(core, "specimen_type")
   if (nrow(endpoints) == 1L) {
     # Single endpoint: rxode2 treats a DVID column as an endpoint index and warns
     # when it is not 1..n, so only emit it for multi-endpoint (PD) datasets.
@@ -307,7 +365,7 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
     core <- setdiff(core, "DVID")
   }
   # `.gmu` / `.srcord` are internal ordering keys, never part of the layout.
-  hidden <- c("gen_subject_uuid", ".gmu", ".srcord")
+  hidden <- c("gen_subject_uuid", ".gmu", ".srcord", ".specimen")
   out <- tibble::as_tibble(events[, c(core, setdiff(names(events), c(core, hidden))), drop = FALSE])
   attr(out, "vmx") <- list(
     data_version_id = md$meta$data_version_id,
@@ -318,8 +376,9 @@ vmx_nlmixr_data <- function(dv, analyte = NULL, time_basis = NULL,
       dose = md$meta$units$dose %||% "mg"
     ),
     analyte = pk_analyte$name,
+    pk_specimen = pk_scope$scope,
     eligibility = eligibility,
-    eligibility_flag = pk$flag %||% dosing$flag,
+    eligibility_flag = pk_admit_flag %||% dosing$flag,
     analysis_ready = strict,
     cmt = cmt,
     endpoints = endpoints,
@@ -347,12 +406,6 @@ vmx_nlmixr_cmt_map <- function(cmt) {
   }
   default[names(cmt)] <- as.integer(cmt)
   default
-}
-
-vmx_nlmixr_pd_selection <- function(pd_markers) {
-  if (is.null(pd_markers) || isFALSE(pd_markers)) return(FALSE)
-  if (isTRUE(pd_markers)) return(TRUE)
-  vmx_nonempty_strings(pd_markers, "pd_markers", unique = TRUE)
 }
 
 vmx_nlmixr_flag_column <- function(eligibility) {
@@ -483,74 +536,6 @@ vmx_nlmixr_basis_pk_flag <- function(meta, basis, eligibility) {
   if (is.logical(value) && length(value) == 1L) value else NULL
 }
 
-# Markers to include: those requested that exist in the pd table AND that the
-# DataVersion marks eligible on the selected basis (eligibility-spec §9:
-# "Selected PD markers additionally require post-QC modeling eligibility").
-# An explicitly named ineligible marker is a usage error; under `TRUE` it is
-# dropped and counted.
-vmx_nlmixr_pd_markers <- function(pd, selection, meta, basis, eligibility, all_rows = pd) {
-  key <- vmx_nlmixr_marker_key(pd)
-  present <- unique(key[!is.na(key)])
-  wanted <- if (isTRUE(selection)) present else selection
-  missing <- setdiff(wanted, present)
-  if (length(missing)) {
-    served <- unique(stats::na.omit(vmx_nlmixr_marker_key(all_rows)))
-    filtered_out <- intersect(missing, served)
-    vmx_abort(
-      if (length(filtered_out)) {
-        sprintf(
-          "%d requested PD marker(s) have no rows admitted by the selected eligibility rule (%s).",
-          length(filtered_out), paste(filtered_out, collapse = ", ")
-        )
-      } else {
-        sprintf(
-          "%d requested PD marker(s) are not in the `pd` table (available: %s).",
-          length(missing), paste(present, collapse = ", ")
-        )
-      },
-      class = "vmx_usage_error"
-    )
-  }
-  flag <- vmx_nlmixr_flag_column(eligibility)
-  ineligible <- character()
-  if (!is.null(flag)) {
-    marker_flags <- vmx_nlmixr_marker_flags(meta, basis, flag)
-    ineligible <- wanted[!is.na(marker_flags[wanted]) & !marker_flags[wanted]]
-  }
-  if (length(ineligible) && !isTRUE(selection)) {
-    vmx_abort(
-      sprintf(
-        "%d requested PD marker(s) are not eligible for modeling on basis '%s' (%s).",
-        length(ineligible), basis %||% "?", paste(ineligible, collapse = ", ")
-      ),
-      class = "vmx_usage_error"
-    )
-  }
-  list(markers = setdiff(wanted, ineligible), n_dropped = length(ineligible))
-}
-
-# Named logical vector marker-name -> eligibility flag, from the DataVersion's
-# per-basis `pd_marker_eligibility` (keyed by marker `gen_uuid`) joined to the
-# `pd_markers` manifest. Empty when the DataVersion does not carry them.
-vmx_nlmixr_marker_flags <- function(meta, basis, flag) {
-  out <- logical()
-  manifest <- meta$pd_markers
-  bases <- meta$time_bases
-  if (!is.list(manifest) || !is.list(bases) || is.null(basis) || !is.list(bases[[basis]])) return(out)
-  elig <- bases[[basis]]$pd_marker_eligibility
-  if (!is.list(elig) || !length(elig)) return(out)
-  uuid_to_name <- stats::setNames(
-    vapply(manifest, function(m) as.character(m$name %||% NA_character_), character(1)),
-    vapply(manifest, function(m) as.character(m$gen_uuid %||% NA_character_), character(1))
-  )
-  for (entry in elig) {
-    nm <- uuid_to_name[as.character(entry$gen_uuid %||% NA_character_)]
-    if (is.na(nm) || is.null(entry[[flag]])) next
-    out[[nm]] <- isTRUE(entry[[flag]])
-  }
-  out
-}
-
 # Row-wise numeric value from the typed columns only (`value_float`, then
 # `value_int`); the untyped source `value` is not a contract column.
 vmx_nlmixr_value <- function(tbl) {
@@ -640,7 +625,10 @@ vmx_nlmixr_observations <- function(tbl, basis, dvid, cmt, domain, strict) {
     DVID = as.integer(dvid),
     # Row identity, carried only to order same-time observations deterministically
     # (dropped before the layout is returned); NA when the table does not serve it.
-    .gmu = as.character(vmx_nlmixr_optional(tbl, "gen_measurement_uuid"))
+    .gmu = as.character(vmx_nlmixr_optional(tbl, "gen_measurement_uuid")),
+    # The row's own recorded specimen, also inside a pooled endpoint; exposed as
+    # `specimen_type` when the source tables record specimens.
+    .specimen = vmx_nlmixr_specimen_column(tbl)
   )
   list(rows = rows[ok, , drop = FALSE], n_dropped = sum(!ok))
 }
@@ -710,7 +698,8 @@ vmx_nlmixr_doses <- function(dosing, basis, cmt, strict) {
     # endpoint's id rather than a sentinel that would shift the numbering.
     DVID = 1L,
     # Dose rows carry no measurement identity; they never take a replicate index.
-    .gmu = NA_character_
+    .gmu = NA_character_,
+    .specimen = NA_character_
   )
   list(rows = rows[ok, , drop = FALSE], n_dropped = sum(!ok))
 }

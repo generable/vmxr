@@ -21,6 +21,7 @@ Not yet implemented. The per-subject \code{start[i]}/\code{end[i]} index ranges 
 \code{iObs} observation index must be derived and verified against real data
 before shipping (this is the error-prone derivation the design flags); see
 the package NEWS. When implemented it should reuse the event assembly in
-\code{\link[=vmx_nlmixr_data]{vmx_nlmixr_data()}} (eligibility admission, basis selection, dose and
-censoring encoding) and only add the ragged indexing on top.
+\code{\link[=vmx_nlmixr_data]{vmx_nlmixr_data()}} (eligibility admission, basis selection, PK and PD
+specimen selection, dose and censoring encoding) and only add the ragged
+indexing on top.
 }
