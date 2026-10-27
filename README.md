@@ -33,8 +33,8 @@ Targets **API `0.2.x` and `0.3` / CLI `0.6.x`**.
 | Treatments / studies | `vmx_treatments()`, `vmx_study_create()`, … |
 | Upload & prep | `vmx_upload()`, `vmx_prep_status()`, `vmx_prep_questions()`, `vmx_prep_answer()`, `vmx_wait()` |
 | Data versions | `vmx_data_versions()`, `vmx_data_version_create()`, `vmx_data_version_table()`, `vmx_subjects()`/`vmx_pk()`/`vmx_dosing()`/`vmx_pd()`, `vmx_model_data()` |
-| NCA | `vmx_nca()`, `vmx_nca_result()` |
-| Modeling | `vmx_model_build()`, `vmx_model_fits()`, `vmx_fit_subject_estimates()`, `vmx_fit_global_estimates()`, `vmx_fit_obs_vs_pred()` |
+| NCA | `vmx_nca()`, `vmx_nca_result()`, `vmx_nca_marker_selection()` |
+| Modeling | `vmx_modeling_options()`, `vmx_model_build()`, `vmx_pd_marker()`, `vmx_all_specimens()`, `vmx_model_build_marker_selection()`, `vmx_model_fits()`, `vmx_model_fit_marker_selection()`, `vmx_fit_subject_estimates()`, `vmx_fit_global_estimates()`, `vmx_fit_obs_vs_pred()` |
 | Simulation | `vmx_dosing_input()`, `vmx_sim_population()`, `vmx_sim_result()` |
 | Audit | `vmx_analysis_log()` |
 
@@ -62,8 +62,30 @@ tmt   <- vmx_treatment_create("Compound XYZ", indication = "atrial fibrillation"
 study <- vmx_study_create(tmt, "Phase 1 SAD", phase = "1")
 ds    <- vmx_upload(study, c("conc.csv", "dosing.csv"), mode = "initial", wait = TRUE)
 dv    <- vmx_data_version(vmx_prep_status(ds)$data_version_id)
-nca   <- vmx_nca(dv, time_basis = "observed")
+nca   <- vmx_nca(dv, time_basis = "observed", pk_specimen = "plasma")
 vmx_nca_result(nca)
+```
+
+### Choosing specimens
+
+NCA runs, modeling previews and model builds always state which specimens they
+use. `pk_specimen` is required: name one PK specimen, or pass
+`vmx_all_specimens()` to pool every specimen. vmxr never picks one for you, not
+even the data version's recommended specimen. If you leave `pk_specimen` out,
+the error lists the specimens the data version offers.
+
+Each PD marker is a `vmx_pd_marker()` that names one specimen or all specimens,
+plus a direction for model builds. To fit one marker in two specimens, add two
+entries:
+
+```r
+pd <- list(
+  vmx_pd_marker(marker_uuid, "serum",  "decreasing"),
+  vmx_pd_marker(marker_uuid, "plasma", "decreasing")
+)
+vmx_modeling_options(dv, "observed", pk_specimen = vmx_all_specimens(), pd_marker = pd)
+run <- vmx_model_build(dv, "observed", pk_specimen = vmx_all_specimens(), pd_marker = pd)
+vmx_model_build_marker_selection(run)   # the selections the API accepted
 ```
 
 ### Sign in with OIDC (no PAT)

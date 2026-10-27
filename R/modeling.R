@@ -77,39 +77,54 @@ vmx_model_describe <- function(model_name, client = vmx_client()) {
 }
 
 #' Preview modeling options for a data version
+#'
+#' `POST /modeling-options` previews the modeling population and available
+#' covariates for one PK specimen scope, a set of PD marker selections and a
+#' time basis. Nothing is persisted.
+#'
+#' `pk_specimen` is required: one PK specimen type (for example `"plasma"`) or
+#' [vmx_all_specimens()]. vmxr never fills it in, not even from the data
+#' version's recommendation; a call without it fails and lists the specimens
+#' available. Each PD marker is a [vmx_pd_marker()] naming one specimen or all
+#' specimens; any `direction` on it is ignored here, so the same selections can
+#' be passed on to [vmx_model_build()].
+#'
 #' @param data_version A data-version id or `vmx_data_version`.
 #' @param time_basis Time basis.
-#' @param pd_marker PD marker gen_uuid(s). `NULL` or `character(0)` explicitly
-#'   previews a PK-only build; pass marker UUIDs to preview PD modeling.
+#' @param pk_specimen One PK specimen type string, or [vmx_all_specimens()].
+#'   Required.
+#' @param pd_marker `NULL` (the default) to preview a PK-only build, or one
+#'   [vmx_pd_marker()] or a list of them.
 #' @param covariate Optional covariate name(s).
 #' @param client A `vmx_client`.
 #' @return A list (the selection preview).
 #' @export
-vmx_modeling_options <- function(data_version, time_basis, pd_marker = NULL,
-                                 covariate = NULL, client = vmx_client()) {
+vmx_modeling_options <- function(data_version, time_basis, pk_specimen,
+                                 pd_marker = NULL, covariate = NULL,
+                                 client = vmx_client()) {
   time_basis <- vmx_nonempty_strings(
     time_basis, "time_basis", exactly_one = TRUE
   )
-  markers <- pd_marker %||% character(0)
-  if (!is.character(markers) || anyNA(markers) ||
-      any(!nzchar(trimws(markers))) || anyDuplicated(markers)) {
-    vmx_abort("`pd_marker` must contain non-empty marker UUID strings.",
-              class = "vmx_usage_error")
-  }
+  data_version_id <- vmx_id(data_version, "dv", "data_version")
+  markers <- vmx_pd_marker_body(pd_marker, direction = FALSE)
   covariates <- if (is.null(covariate)) {
     NULL
   } else {
     vmx_nonempty_strings(covariate, "covariate", unique = TRUE)
   }
+  if (missing(pk_specimen)) pk_specimen <- NULL
   body <- list(
-    data_version_id = vmx_id(data_version, "dv", "data_version"),
+    data_version_id = data_version_id,
     time_basis = time_basis,
-    # The API defines null/omitted as "all markers". Send [] deliberately so
-    # the default preflight matches vmx_model_build()'s PK-only default.
-    pd_markers = as.list(markers)
+    pk_specimen = vmx_pk_specimen_body(pk_specimen, data_version_id, client),
+    # Required and non-null; [] selects no PD marker (a PK-only preview).
+    pd_markers = markers
   )
   if (!is.null(covariates)) body$covariates <- as.list(covariates)
-  out <- vmx_post(client, "/modeling-options", body)
+  out <- vmx_with_specimen_errors(
+    vmx_post(client, "/modeling-options", body, .vmx_marker_scopes),
+    data_version_id, client
+  )
   vmx_validate_response_id(
     out, "data_version_id", body$data_version_id, "modeling options"
   )
@@ -118,13 +133,20 @@ vmx_modeling_options <- function(data_version, time_basis, pd_marker = NULL,
 
 #' Start a model build run (optionally wait)
 #'
-#' `pd_marker` uses the design's `"GEN_uuid:increasing"` / `":decreasing"`
-#' shorthand; it is parsed into the API's `{gen_uuid, direction}` form.
+#' `pk_specimen` is required: one PK specimen type (for example `"plasma"`) or
+#' [vmx_all_specimens()]. vmxr never fills it in, not even from the data
+#' version's recommendation; a call without it fails and lists the specimens
+#' available. Each PD marker is a [vmx_pd_marker()] naming one specimen or all
+#' specimens, with its `direction`. Two specimens of one marker may be selected
+#' as separate entries. Read the accepted selections back with
+#' [vmx_model_build_marker_selection()].
 #'
 #' @param data_version A data-version id or `vmx_data_version`.
 #' @param time_basis Time basis.
-#' @param pd_marker Optional `"GEN_uuid:increasing"` / `":decreasing"`
-#'   string(s). `NULL` or `character(0)` requests a PK-only build.
+#' @param pk_specimen One PK specimen type string, or [vmx_all_specimens()].
+#'   Required.
+#' @param pd_marker `NULL` (the default) for a PK-only build, or one
+#'   [vmx_pd_marker()] or a list of them, each with a `direction`.
 #' @param covariate Optional covariate name(s).
 #' @param idempotency_key Optional idempotency key.
 #' @param retried_from Optional prior run to retry from.
@@ -134,25 +156,28 @@ vmx_modeling_options <- function(data_version, time_basis, pd_marker = NULL,
 #' @param client A `vmx_client`.
 #' @return A `vmx_model_build_run`.
 #' @export
-vmx_model_build <- function(data_version, time_basis, pd_marker = NULL,
-                            covariate = NULL, idempotency_key = NULL,
-                            retried_from = NULL, wait = FALSE, ...,
-                            client = vmx_client()) {
+vmx_model_build <- function(data_version, time_basis, pk_specimen,
+                            pd_marker = NULL, covariate = NULL,
+                            idempotency_key = NULL, retried_from = NULL,
+                            wait = FALSE, ..., client = vmx_client()) {
   time_basis <- vmx_nonempty_strings(
     time_basis, "time_basis", exactly_one = TRUE
   )
+  data_version_id <- vmx_id(data_version, "dv", "data_version")
+  pdm <- vmx_pd_marker_body(pd_marker, direction = TRUE)
   covariates <- if (is.null(covariate)) {
     character(0)
   } else {
     vmx_nonempty_strings(covariate, "covariate", unique = TRUE)
   }
+  if (missing(pk_specimen)) pk_specimen <- NULL
   body <- list(
-    data_version_id = vmx_id(data_version, "dv", "data_version"),
+    data_version_id = data_version_id,
     time_basis = time_basis,
-    covariates = as.list(covariates)
+    pk_specimen = vmx_pk_specimen_body(pk_specimen, data_version_id, client),
+    covariates = as.list(covariates),
+    pd_markers = pdm
   )
-  pdm <- vmx_pd_markers(pd_marker)
-  body$pd_markers <- pdm
   if (!is.null(idempotency_key)) {
     vmx_id_like_scalar(idempotency_key, "idempotency_key")
     body$idempotency_key <- idempotency_key
@@ -161,7 +186,10 @@ vmx_model_build <- function(data_version, time_basis, pd_marker = NULL,
     body$retried_from <- vmx_id(retried_from, "run", "retried_from")
   }
 
-  data <- vmx_post(client, "/model-build-runs", body)
+  data <- vmx_with_specimen_errors(
+    vmx_post(client, "/model-build-runs", body, .vmx_marker_scopes),
+    data_version_id, client
+  )
   vmx_validate_response_id(
     data, "data_version_id", body$data_version_id, "model-build creation"
   )
@@ -171,32 +199,12 @@ vmx_model_build <- function(data_version, time_basis, pd_marker = NULL,
   if (isTRUE(wait)) vmx_wait(run, client = client, ...) else run
 }
 
-# Parse "GEN_uuid:direction" shorthand into the API's marker objects.
-vmx_pd_markers <- function(x) {
-  if (is.null(x)) return(list())
-  if (!is.character(x) || anyNA(x) || any(!nzchar(trimws(x)))) {
-    vmx_abort("`pd_marker` must be a character vector.", class = "vmx_usage_error")
-  }
-  out <- lapply(x, function(s) {
-    parts <- strsplit(s, ":", fixed = TRUE)[[1]]
-    if (length(parts) != 2L || !nzchar(parts[[1]]) ||
-        !parts[[2]] %in% c("increasing", "decreasing")) {
-      vmx_abort(
-        sprintf("pd_marker '%s' must be 'GEN_uuid:increasing' or 'GEN_uuid:decreasing'.", s),
-        class = "vmx_usage_error"
-      )
-    }
-    list(gen_uuid = parts[[1]], direction = parts[[2]])
-  })
-  ids <- vapply(out, `[[`, character(1), "gen_uuid")
-  if (anyDuplicated(ids)) {
-    vmx_abort("`pd_marker` contains a duplicate marker UUID.",
-              class = "vmx_usage_error")
-  }
-  out
-}
-
 #' List model build runs
+#'
+#' Run and fit reads request the API's marker-scopes representation, so runs
+#' that select a PD marker across all specimens are listed and readable, and PD
+#' selections report `specimen_type` or `all_specimens`.
+#'
 #' @param data_version,study,treatment,status Optional filters.
 #' @param client A `vmx_client`.
 #' @return A tibble containing all matching model-build runs.
@@ -210,7 +218,7 @@ vmx_model_build_runs <- function(data_version = NULL, study = NULL,
     treatment_id = vmx_opt_id(treatment, "tmt", "treatment"),
     status = status
   )
-  vmx_paginate(client, "/model-build-runs", params)
+  vmx_paginate(client, "/model-build-runs", c(params, .vmx_marker_scopes))
 }
 
 #' Build-run status
@@ -220,7 +228,9 @@ vmx_model_build_runs <- function(data_version = NULL, study = NULL,
 #' @export
 vmx_model_build_status <- function(run, client = vmx_client()) {
   run_id <- vmx_id(run, "run")
-  data <- vmx_get(client, paste0("/model-build-runs/", run_id, "/status"))
+  data <- vmx_get(
+    client, paste0("/model-build-runs/", run_id, "/status"), .vmx_marker_scopes
+  )
   vmx_validate_response_id(data, "run_id", run_id, "model-build status")
   new_vmx_resource(data, "vmx_model_build_run", "run_id")
 }
@@ -248,7 +258,9 @@ vmx_model_build_logs <- function(run, client = vmx_client(),
 #' @export
 vmx_model_build_results <- function(run, client = vmx_client()) {
   run_id <- vmx_id(run, "run")
-  out <- vmx_get(client, paste0("/model-build-runs/", run_id, "/results"))
+  out <- vmx_get(
+    client, paste0("/model-build-runs/", run_id, "/results"), .vmx_marker_scopes
+  )
   vmx_validate_response_id(out, "run_id", run_id, "model-build results")
   out
 }
@@ -314,7 +326,10 @@ vmx_model_build_report_create <- function(run, subject_plot_mode = c("all", "non
 #' @export
 vmx_model_build_cancel <- function(run, client = vmx_client()) {
   run_id <- vmx_id(run, "run")
-  data <- vmx_post(client, paste0("/model-build-runs/", run_id, "/cancel"))
+  data <- vmx_post(
+    client, paste0("/model-build-runs/", run_id, "/cancel"),
+    params = .vmx_marker_scopes
+  )
   vmx_validate_response_id(data, "run_id", run_id, "model-build cancellation")
   new_vmx_resource(data, "vmx_model_build_run", "run_id")
 }
@@ -341,6 +356,11 @@ vmx_model_build_artifacts <- function(run, dest = ".", client = vmx_client()) {
 # ---- Fits ------------------------------------------------------------------
 
 #' List model fits
+#'
+#' Requests the marker-scopes representation, so fits of a PD marker selected
+#' across all specimens are listed and each PD `marker` reports its specimen
+#' scope.
+#'
 #' @param run Optional model-build run filter.
 #' @param data_version Optional data-version filter.
 #' @param treatment Optional treatment filter.
@@ -368,7 +388,7 @@ vmx_model_fits <- function(run = NULL, data_version = NULL, model_type = NULL,
     ),
     status = status
   )
-  vmx_paginate(client, "/model-fits", params)
+  vmx_paginate(client, "/model-fits", c(params, .vmx_marker_scopes))
 }
 
 #' Fetch one model fit's details
@@ -378,7 +398,7 @@ vmx_model_fits <- function(run = NULL, data_version = NULL, model_type = NULL,
 #' @export
 vmx_model_fit <- function(id, client = vmx_client()) {
   mf <- vmx_id(id, "mf")
-  data <- vmx_get(client, paste0("/model-fits/", mf, "/details"))
+  data <- vmx_get(client, paste0("/model-fits/", mf, "/details"), .vmx_marker_scopes)
   metadata <- vmx_response_field(data, "metadata", "model-fit details.metadata")
   vmx_validate_response_id(
     metadata, "model_fit_id", mf, "model-fit details metadata"
@@ -412,7 +432,9 @@ vmx_model_fit_postprocessor_status <- function(fit, client = vmx_client()) {
 #' @export
 vmx_fit_subject_estimates <- function(fit, client = vmx_client()) {
   fit_id <- vmx_id(fit, "mf")
-  d <- vmx_get(client, paste0("/model-fits/", fit_id, "/subject-estimates"))
+  d <- vmx_get(
+    client, paste0("/model-fits/", fit_id, "/subject-estimates"), .vmx_marker_scopes
+  )
   vmx_validate_response_id(d, "model_fit_id", fit_id, "subject estimates")
   gen_subject_uuid <- vmx_response_vector(
     vmx_response_field(d, "gen_subject_uuid", "subject estimates.gen_subject_uuid"),
@@ -480,7 +502,9 @@ vmx_fit_subject_estimates <- function(fit, client = vmx_client()) {
 #' @export
 vmx_fit_global_estimates <- function(fit, client = vmx_client()) {
   fit_id <- vmx_id(fit, "mf")
-  d <- vmx_get(client, paste0("/model-fits/", fit_id, "/global-estimates"))
+  d <- vmx_get(
+    client, paste0("/model-fits/", fit_id, "/global-estimates"), .vmx_marker_scopes
+  )
   vmx_validate_response_id(d, "model_fit_id", fit_id, "global estimates")
   estimates <- vmx_estimate_rows(d, "global estimates")
   rows <- lapply(seq_along(estimates), function(i) {
@@ -531,7 +555,9 @@ vmx_fit_global_estimates <- function(fit, client = vmx_client()) {
 #' @export
 vmx_fit_obs_vs_pred <- function(fit, client = vmx_client()) {
   fit_id <- vmx_id(fit, "mf")
-  art <- vmx_get(client, paste0("/model-fits/", fit_id, "/obs-vs-pred"))
+  art <- vmx_get(
+    client, paste0("/model-fits/", fit_id, "/obs-vs-pred"), .vmx_marker_scopes
+  )
   vmx_validate_response_id(art, "model_fit_id", fit_id, "observed-vs-predicted")
   pk <- vmx_response_field(art, "pk", "observed-vs-predicted.pk")
   out <- vmx_obs_vs_pred_block(
@@ -581,7 +607,7 @@ vmx_fit_obs_vs_pred <- function(fit, client = vmx_client()) {
 #' @export
 vmx_fit_vpc <- function(fit, client = vmx_client()) {
   fit_id <- vmx_id(fit, "mf")
-  out <- vmx_get(client, paste0("/model-fits/", fit_id, "/vpc"))
+  out <- vmx_get(client, paste0("/model-fits/", fit_id, "/vpc"), .vmx_marker_scopes)
   vmx_validate_response_id(out, "model_fit_id", fit_id, "VPC")
   out
 }
@@ -864,9 +890,11 @@ vmx_obs_vs_pred_block <- function(block, context, observed_field,
         field = paste0(context, ".marker.name")
       )
     }
-    attr(out, "marker") <- list(
-      gen_uuid = marker_gen_uuid,
-      name = marker_value
+    # Keep the fitted specimen scope (specimen_type or all_specimens) when the
+    # PdResponseMarker carries one.
+    attr(out, "marker") <- c(
+      list(gen_uuid = marker_gen_uuid, name = marker_value),
+      marker[intersect(c("specimen_type", "all_specimens"), names(marker))]
     )
   }
   out$predicted_value <- estimate$value

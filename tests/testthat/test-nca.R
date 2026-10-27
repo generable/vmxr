@@ -36,24 +36,25 @@ test_that("vmx_nca_analyses returns all server-owned pages", {
 
 test_that("vmx_nca creates without waiting and posts the right body", {
   env <- capture_req(nca_item("nca_9"))
-  nca <- vmx_nca("dv_1", "observed", wait = FALSE, client = con)
+  nca <- vmx_nca("dv_1", "observed", pk_specimen = "plasma", wait = FALSE, client = con)
   expect_s3_class(nca, "vmx_nca_analysis")
   expect_equal(env$req$body$data$data_version_id, "dv_1")
   expect_equal(env$req$body$data$time_basis, "observed")
+  expect_equal(env$req$body$data$pk_specimen, list(specimen_type = "plasma"))
   expect_match(env$req$url, "/nca-analyses$")
 })
 
 test_that("vmx_nca validates scalar controls and retry ids", {
   expect_error(
     vmx_nca(
-      "dv_1", c("observed", "nominal"),
+      "dv_1", c("observed", "nominal"), pk_specimen = "plasma",
       wait = FALSE, client = con
     ),
     class = "vmx_usage_error"
   )
   expect_error(
     vmx_nca(
-      "dv_1", "observed", retried_from = "run_wrong",
+      "dv_1", "observed", pk_specimen = "plasma", retried_from = "run_wrong",
       wait = FALSE, client = con
     ),
     class = "vmx_usage_error"
@@ -66,7 +67,7 @@ test_that("vmx_nca with wait=TRUE polls to a terminal state", {
     httr2::response_json(body = nca_item("nca_9", "running")),  # poll 1
     httr2::response_json(body = nca_item("nca_9", "completed")) # poll 2
   ))
-  nca <- vmx_nca("dv_1", "observed", wait = TRUE, interval = 0.001,
+  nca <- vmx_nca("dv_1", "observed", pk_specimen = "plasma", wait = TRUE, interval = 0.001,
                  progress = FALSE, client = con)
   expect_equal(nca$status, "completed")
 })

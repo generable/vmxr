@@ -38,6 +38,11 @@ reference:
     contents:
       - starts_with("vmx_model")
       - starts_with("vmx_fit_")
+  - title: Specimen selections
+    contents:
+      - vmx_all_specimens
+      - vmx_pd_marker
+      - vmx_marker_selection
   - title: Simulation
     contents:
       - starts_with("vmx_sim")

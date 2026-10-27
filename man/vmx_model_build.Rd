@@ -7,6 +7,7 @@
 vmx_model_build(
   data_version,
   time_basis,
+  pk_specimen,
   pd_marker = NULL,
   covariate = NULL,
   idempotency_key = NULL,
@@ -21,8 +22,11 @@ vmx_model_build(
 
 \item{time_basis}{Time basis.}
 
-\item{pd_marker}{Optional \code{"GEN_uuid:increasing"} / \code{":decreasing"}
-string(s). \code{NULL} or \code{character(0)} requests a PK-only build.}
+\item{pk_specimen}{One PK specimen type string, or \code{\link[=vmx_all_specimens]{vmx_all_specimens()}}.
+Required.}
+
+\item{pd_marker}{\code{NULL} (the default) for a PK-only build, or one
+\code{\link[=vmx_pd_marker]{vmx_pd_marker()}} or a list of them, each with a \code{direction}.}
 
 \item{covariate}{Optional covariate name(s).}
 
@@ -41,6 +45,11 @@ string(s). \code{NULL} or \code{character(0)} requests a PK-only build.}
 A \code{vmx_model_build_run}.
 }
 \description{
-\code{pd_marker} uses the design's \code{"GEN_uuid:increasing"} / \code{":decreasing"}
-shorthand; it is parsed into the API's \verb{\{gen_uuid, direction\}} form.
+\code{pk_specimen} is required: one PK specimen type (for example \code{"plasma"}) or
+\code{\link[=vmx_all_specimens]{vmx_all_specimens()}}. vmxr never fills it in, not even from the data
+version's recommendation; a call without it fails and lists the specimens
+available. Each PD marker is a \code{\link[=vmx_pd_marker]{vmx_pd_marker()}} naming one specimen or all
+specimens, with its \code{direction}. Two specimens of one marker may be selected
+as separate entries. Read the accepted selections back with
+\code{\link[=vmx_model_build_marker_selection]{vmx_model_build_marker_selection()}}.
 }

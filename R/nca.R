@@ -26,12 +26,21 @@ vmx_nca_analyses <- function(data_version = NULL, study = NULL, treatment = NULL
 #' Run an NCA analysis
 #'
 #' Creates the analysis (`POST /nca-analyses`) and, by default, blocks until it
-#' settles. `time_basis` is one of `"observed"`, `"nominal"`, or
-#' `"nominal_from_observed_dose"` (validated server-side against the
-#' DataVersion's available bases).
+#' settles. `time_basis` is one of `"observed"`, `"nominal"`,
+#' `"nominal_from_observed_dose"`, or `"observed_from_predose_pk"` (validated
+#' server-side against the DataVersion's available bases).
+#'
+#' `pk_specimen` is required: name one PK specimen (for example `"plasma"`) or
+#' pass [vmx_all_specimens()] to pool every specimen. vmxr never chooses one for
+#' you, not even the data version's recommended specimen; a call without it
+#' fails and lists the specimens the data version offers. A named specimen needs
+#' the data version's per-specimen marker analysis. Read the accepted selection
+#' back with [vmx_nca_marker_selection()].
 #'
 #' @param data_version A data-version id (`dv_...`) or `vmx_data_version`.
 #' @param time_basis The time basis to compute on.
+#' @param pk_specimen One PK specimen type string, or [vmx_all_specimens()].
+#'   Required.
 #' @param idempotency_key,retried_from Optional create fields.
 #' @param wait If `TRUE` (default), block until the analysis is terminal.
 #' @param ... Polling controls forwarded to [vmx_wait()] when `wait = TRUE`
@@ -39,22 +48,28 @@ vmx_nca_analyses <- function(data_version = NULL, study = NULL, treatment = NULL
 #' @param client A `vmx_client`.
 #' @return A `vmx_nca_analysis`.
 #' @export
-vmx_nca <- function(data_version, time_basis, idempotency_key = NULL,
-                    retried_from = NULL, wait = TRUE, ...,
-                    client = vmx_client()) {
+vmx_nca <- function(data_version, time_basis, pk_specimen,
+                    idempotency_key = NULL, retried_from = NULL, wait = TRUE,
+                    ..., client = vmx_client()) {
   time_basis <- vmx_nonempty_strings(
     time_basis, "time_basis", exactly_one = TRUE
   )
   if (!is.null(idempotency_key)) {
     vmx_id_like_scalar(idempotency_key, "idempotency_key")
   }
+  data_version_id <- vmx_id(data_version, "dv", "data_version")
+  if (missing(pk_specimen)) pk_specimen <- NULL
   body <- vmx_compact(list(
-    data_version_id = vmx_id(data_version, "dv", "data_version"),
+    data_version_id = data_version_id,
     time_basis = time_basis,
+    pk_specimen = vmx_pk_specimen_body(pk_specimen, data_version_id, client),
     idempotency_key = idempotency_key,
     retried_from = vmx_opt_id(retried_from, "nca", "retried_from")
   ))
-  data <- vmx_post(client, "/nca-analyses", body)
+  data <- vmx_with_specimen_errors(
+    vmx_post(client, "/nca-analyses", body),
+    data_version_id, client
+  )
   vmx_validate_response_id(
     data, "data_version_id", body$data_version_id, "NCA creation"
   )
