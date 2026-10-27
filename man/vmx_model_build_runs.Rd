@@ -21,5 +21,7 @@ vmx_model_build_runs(
 A tibble containing all matching model-build runs.
 }
 \description{
-List model build runs
+Run and fit reads request the API's marker-scopes representation, so runs
+that select a PD marker across all specimens are listed and readable, and PD
+selections report \code{specimen_type} or \code{all_specimens}.
 }

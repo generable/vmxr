@@ -7,6 +7,7 @@
 vmx_modeling_options(
   data_version,
   time_basis,
+  pk_specimen,
   pd_marker = NULL,
   covariate = NULL,
   client = vmx_client()
@@ -17,8 +18,11 @@ vmx_modeling_options(
 
 \item{time_basis}{Time basis.}
 
-\item{pd_marker}{PD marker gen_uuid(s). \code{NULL} or \code{character(0)} explicitly
-previews a PK-only build; pass marker UUIDs to preview PD modeling.}
+\item{pk_specimen}{One PK specimen type string, or \code{\link[=vmx_all_specimens]{vmx_all_specimens()}}.
+Required.}
+
+\item{pd_marker}{\code{NULL} (the default) to preview a PK-only build, or one
+\code{\link[=vmx_pd_marker]{vmx_pd_marker()}} or a list of them.}
 
 \item{covariate}{Optional covariate name(s).}
 
@@ -28,5 +32,15 @@ previews a PK-only build; pass marker UUIDs to preview PD modeling.}
 A list (the selection preview).
 }
 \description{
-Preview modeling options for a data version
+\code{POST /modeling-options} previews the modeling population and available
+covariates for one PK specimen scope, a set of PD marker selections and a
+time basis. Nothing is persisted.
+}
+\details{
+\code{pk_specimen} is required: one PK specimen type (for example \code{"plasma"}) or
+\code{\link[=vmx_all_specimens]{vmx_all_specimens()}}. vmxr never fills it in, not even from the data
+version's recommendation; a call without it fails and lists the specimens
+available. Each PD marker is a \code{\link[=vmx_pd_marker]{vmx_pd_marker()}} naming one specimen or all
+specimens; any \code{direction} on it is ignored here, so the same selections can
+be passed on to \code{\link[=vmx_model_build]{vmx_model_build()}}.
 }

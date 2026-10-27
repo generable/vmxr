@@ -39,5 +39,7 @@ vmx_model_fits(
 A tibble containing all matching model fits.
 }
 \description{
-List model fits
+Requests the marker-scopes representation, so fits of a PD marker selected
+across all specimens are listed and each PD \code{marker} reports its specimen
+scope.
 }

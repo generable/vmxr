@@ -115,7 +115,8 @@ test_that("vmx_fit_obs_vs_pred reshapes current Estimate envelopes", {
       effect_score = list(
         marker = list(
           gen_uuid = "33333333-3333-4333-8333-333333333333",
-          name = "effect_score"
+          name = "effect_score",
+          specimen_type = "serum"
         ),
         gen_measurement_uuid = list(
           "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbb1"
@@ -167,6 +168,7 @@ test_that("vmx_fit_obs_vs_pred reshapes current Estimate envelopes", {
     attr(pd, "marker")$gen_uuid,
     "33333333-3333-4333-8333-333333333333"
   )
+  expect_equal(attr(pd, "marker")$specimen_type, "serum")
   expect_equal(attr(tbl, "model_fit_id"), "mf_1")
 })
 

@@ -41,16 +41,20 @@ test_that("model catalog helpers reject malformed inputs and responses", {
   )
 })
 
-test_that("vmx_model_build parses pd_marker shorthand and posts the body", {
+test_that("vmx_model_build posts specimen-scoped PD markers and the body", {
   env <- capture_one(run_item("run_9"))
-  run <- vmx_model_build("dv_1", "observed",
-                         pd_marker = "GEN_abc:decreasing",
+  run <- vmx_model_build("dv_1", "observed", pk_specimen = "plasma",
+                         pd_marker = vmx_pd_marker("GEN_abc", "serum", "decreasing"),
                          covariate = c("WT", "AGE"), wait = FALSE, client = con)
   expect_s3_class(run, "vmx_model_build_run")
   body <- env$req$body$data
   expect_equal(body$data_version_id, "dv_1")
   expect_equal(body$covariates, list("WT", "AGE"))
-  expect_equal(body$pd_markers, list(list(gen_uuid = "GEN_abc", direction = "decreasing")))
+  expect_equal(body$pk_specimen, list(specimen_type = "plasma"))
+  expect_equal(
+    body$pd_markers,
+    list(list(gen_uuid = "GEN_abc", specimen_type = "serum", direction = "decreasing"))
+  )
 })
 
 test_that("PK-only modeling options and builds send an explicit empty marker selection", {
@@ -64,22 +68,28 @@ test_that("PK-only modeling options and builds send an explicit empty marker sel
     modeling_population = list(),
     available_covariates = list()
   ))
-  vmx_modeling_options("dv_1", "observed", client = con)
+  vmx_modeling_options("dv_1", "observed", pk_specimen = "plasma", client = con)
   expect_equal(options_env$req$body$data$pd_markers, list())
 
   build_env <- capture_one(run_item("run_10"))
-  vmx_model_build("dv_1", "observed", client = con)
+  vmx_model_build("dv_1", "observed", pk_specimen = "plasma", client = con)
   expect_equal(build_env$req$body$data$pd_markers, list())
 })
 
 test_that("vmx_model_build rejects malformed pd_marker", {
   expect_error(
-    vmx_model_build("dv_1", "observed", pd_marker = "GEN_abc:sideways", client = con),
+    vmx_model_build("dv_1", "observed", pk_specimen = "plasma",
+                    pd_marker = "GEN_abc:decreasing", client = con),
+    class = "vmx_usage_error"
+  )
+  expect_error(
+    vmx_pd_marker("GEN_abc", "serum", "sideways"),
     class = "vmx_usage_error"
   )
   expect_error(
     vmx_model_build(
-      "dv_1", "observed", covariate = c("WT", "WT"), client = con
+      "dv_1", "observed", pk_specimen = "plasma", covariate = c("WT", "WT"),
+      client = con
     ),
     class = "vmx_usage_error"
   )
@@ -91,7 +101,8 @@ test_that("vmx_model_build wait=TRUE polls to terminal", {
     httr2::response_json(body = run_item("run_9", "running")),
     httr2::response_json(body = run_item("run_9", "succeeded"))
   ))
-  run <- vmx_model_build("dv_1", "observed", wait = TRUE, interval = 0.001,
+  run <- vmx_model_build("dv_1", "observed", pk_specimen = "plasma",
+                         wait = TRUE, interval = 0.001,
                          progress = FALSE, client = con)
   expect_equal(run$status, "succeeded")
 })

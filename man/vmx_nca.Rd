@@ -7,6 +7,7 @@
 vmx_nca(
   data_version,
   time_basis,
+  pk_specimen,
   idempotency_key = NULL,
   retried_from = NULL,
   wait = TRUE,
@@ -18,6 +19,9 @@ vmx_nca(
 \item{data_version}{A data-version id (\code{dv_...}) or \code{vmx_data_version}.}
 
 \item{time_basis}{The time basis to compute on.}
+
+\item{pk_specimen}{One PK specimen type string, or \code{\link[=vmx_all_specimens]{vmx_all_specimens()}}.
+Required.}
 
 \item{idempotency_key, retried_from}{Optional create fields.}
 
@@ -33,7 +37,15 @@ A \code{vmx_nca_analysis}.
 }
 \description{
 Creates the analysis (\code{POST /nca-analyses}) and, by default, blocks until it
-settles. \code{time_basis} is one of \code{"observed"}, \code{"nominal"}, or
-\code{"nominal_from_observed_dose"} (validated server-side against the
-DataVersion's available bases).
+settles. \code{time_basis} is one of \code{"observed"}, \code{"nominal"},
+\code{"nominal_from_observed_dose"}, or \code{"observed_from_predose_pk"} (validated
+server-side against the DataVersion's available bases).
+}
+\details{
+\code{pk_specimen} is required: name one PK specimen (for example \code{"plasma"}) or
+pass \code{\link[=vmx_all_specimens]{vmx_all_specimens()}} to pool every specimen. vmxr never chooses one for
+you, not even the data version's recommended specimen; a call without it
+fails and lists the specimens the data version offers. A named specimen needs
+the data version's per-specimen marker analysis. Read the accepted selection
+back with \code{\link[=vmx_nca_marker_selection]{vmx_nca_marker_selection()}}.
 }

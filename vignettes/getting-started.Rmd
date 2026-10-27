@@ -43,7 +43,7 @@ ds <- vmx_upload(study, files = c("conc.csv", "dosing.csv"),
                  mode = "initial", wait = TRUE)
 
 dv  <- vmx_data_version(vmx_prep_status(ds)$data_version_id)
-nca <- vmx_nca(dv, time_basis = "observed")   # creates + waits
+nca <- vmx_nca(dv, time_basis = "observed", pk_specimen = "plasma")   # creates + waits
 
 vmx_nca_result(nca)
 ```
@@ -66,7 +66,8 @@ md$pk; md$dosing; md$subjects; md$meta
 ## Fit a model and pull diagnostics
 
 ```{r, purl = FALSE}
-run <- vmx_model_build(dv, time_basis = "observed", wait = TRUE)
+run <- vmx_model_build(dv, time_basis = "observed",
+                       pk_specimen = vmx_all_specimens(), wait = TRUE)
 fit <- vmx_model_fits(run = run) |> dplyr::slice(1) |> dplyr::pull(model_fit_id) |> vmx_model_fit()
 
 vmx_fit_global_estimates(fit)   # population estimates + server-defined intervals

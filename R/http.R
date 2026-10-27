@@ -95,11 +95,11 @@ vmx_get <- function(client, path, params = list()) {
   vmx_perform(vmx_req_query(vmx_req(client, path), params))
 }
 
-#' POST a JSON body and return the parsed response
+#' POST a JSON body (with optional query params) and return the parsed response
 #' @keywords internal
 #' @noRd
-vmx_post <- function(client, path, body = NULL) {
-  req <- httr2::req_method(vmx_req(client, path), "POST")
+vmx_post <- function(client, path, body = NULL, params = list()) {
+  req <- httr2::req_method(vmx_req_query(vmx_req(client, path), params), "POST")
   if (!is.null(body)) req <- httr2::req_body_json(req, body)
   vmx_perform(req)
 }

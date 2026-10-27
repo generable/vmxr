@@ -1,5 +1,31 @@
 # vmxr 0.3.0
 
+* NCA runs, modeling previews and model builds now state their specimens, as
+  the API requires (api-contract §5.6.2). Breaking change:
+  * `vmx_nca()`, `vmx_modeling_options()` and `vmx_model_build()` take a
+    required `pk_specimen`: one specimen type string such as `"plasma"`, or the
+    new `vmx_all_specimens()` sentinel to pool every specimen. All specimens is
+    never a default, and vmxr never applies the data version's recommended
+    specimen. A call without `pk_specimen` fails and lists the PK specimens the
+    data version offers.
+  * PD markers are now built with the new `vmx_pd_marker(gen_uuid, specimen,
+    direction)`, where `specimen` is one specimen type or
+    `vmx_all_specimens()`. Two specimens of one marker may be separate entries.
+    The bare-UUID form of `vmx_modeling_options(pd_marker =)` and the
+    `"uuid:direction"` shorthand of `vmx_model_build(pd_marker =)` are no
+    longer accepted. `vmx_modeling_options()` ignores `direction`, so the same
+    list can be previewed and then built.
+  * Model-build and model-fit requests opt into the `marker_scopes`
+    representation, so runs and fits that pool a PD marker across specimens can
+    be created, read and listed. `vmx_fit_obs_vs_pred()` PD `marker` attributes
+    keep the fitted `specimen_type` or `all_specimens`.
+  * New `vmx_nca_marker_selection()`, `vmx_model_build_marker_selection()` and
+    `vmx_model_fit_marker_selection()` read the selections the API accepted.
+  * The API's specimen rejections (`invalid_pk_specimen`,
+    `invalid_pd_markers`, `marker_analysis_unavailable`,
+    `marker_scopes_representation_required`) are raised as
+    `vmx_specimen_error` (a `vmx_api_error`) with a hint on what to change.
+
 * `vmx_data_version_export()` called without `dest` no longer returns the
   signed `download_url` (AGE-240). The server's download link is short-lived —
   its window is narrowing to 60 seconds — so handing it back to an interactive
